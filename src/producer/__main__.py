@@ -18,7 +18,7 @@ logger = structlog.getLogger()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog=Path(__file__).stem)
+    parser = argparse.ArgumentParser(prog="producer")
     parser.add_argument(
         "--batch-size",
         type=int,
@@ -54,11 +54,11 @@ if __name__ == "__main__":
             data_sink = LocalFileDataSink(output=Path(args.local_file_output))
         case DataSinkType.S3:
             data_sink = S3DataSink(
-                endpoint_url=f"http://localhost:{os.environ['MINIO_SERVER_PORT']}",
+                endpoint_url=os.environ["AWS_ENDPOINT_URL"],
                 region=os.environ["AWS_REGION"],
                 access_key=os.environ["AWS_ACCESS_KEY_ID"],
                 secret_key=os.environ["AWS_SECRET_ACCESS_KEY"],
-                bucket=os.environ["AWS_RAW_BUCKET"],
+                bucket=os.environ["AWS_BUCKET"],
             )
         case _:
             raise NotImplementedError(f"Unsupported data sink type: {data_sink_type}")

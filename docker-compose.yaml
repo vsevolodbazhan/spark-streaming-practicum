@@ -1,7 +1,7 @@
 services:
   minio:
     image: $MINIO_IMAGE
-    container_name: $MINIO_SERVER_CONTAINER
+    container_name: $DOCKER_CONTAINER_PREFIX-$MINIO_SERVER_CONTAINER
     environment:
       MINIO_ROOT_USER: $MINIO_ROOT_USER
       MINIO_ROOT_PASSWORD: $MINIO_ROOT_PASSWORD
@@ -22,7 +22,7 @@ services:
 
   minio-create-buckets:
     image: minio/mc
-    container_name: minio-create-buckets
+    container_name: $DOCKER_CONTAINER_PREFIX-minio-create-buckets
     environment:
       AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
@@ -31,12 +31,31 @@ services:
     command:
       - -c
       - |
-        /usr/bin/mc alias set local http://$MINIO_SERVER_CONTAINER:$MINIO_SERVER_PORT $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD;
-        /usr/bin/mc mb local/$AWS_RAW_BUCKET;
+        /usr/bin/mc alias set local http://$DOCKER_CONTAINER_PREFIX-$MINIO_SERVER_CONTAINER:$MINIO_SERVER_PORT $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD;
+        /usr/bin/mc mb local/$AWS_PRODUCER_BUCKET;
         exit 0;
     depends_on:
       minio:
         condition: service_healthy
+
+  producer:
+    container_name: $DOCKER_CONTAINER_PREFIX-producer
+    build:
+      context: .
+      target: producer
+    environment:
+      AWS_ENDPOINT_URL: http://$DOCKER_CONTAINER_PREFIX-$MINIO_SERVER_CONTAINER:$MINIO_SERVER_PORT
+      AWS_REGION: $AWS_REGION
+      AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+      AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+      AWS_BUCKET: $AWS_PRODUCER_BUCKET
+    command:
+      - --data-sink
+      - s3
+    restart: on-failure
+    depends_on:
+      minio-create-buckets:
+        condition: service_completed_successfully
 
 volumes:
   minio:
