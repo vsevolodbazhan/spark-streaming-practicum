@@ -9,4 +9,5 @@ dependencies = []
 [dependency-groups]
 producer = [
     "faker>=40.1.2",
+    "rich>=14.3.1",
 ]

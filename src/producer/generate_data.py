@@ -1,12 +1,15 @@
+import json
 import random
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import cache
 from pathlib import Path
-from typing import Iterator
+from time import sleep
+from typing import Any, Iterable, Iterator
 from uuid import uuid4
 
 from faker import Faker
+from rich import print
 
 fake = Faker()
 
@@ -16,14 +19,14 @@ class EventType(StrEnum):
 
 
 class EventFactory:
-    def create_random_events(self, n: int = 1) -> Iterator[dict]:
+    def create_random_events(self, n: int = 1) -> Iterator[str]:
         """
         Create a batch of random events.
         """
         for _ in range(n):
             yield self.create_event()
 
-    def create_event(self, event_type: EventType | None = None) -> dict:
+    def create_event(self, event_type: EventType | None = None) -> str:
         """
         Create event. If the event type is not specified, it will be chosen
         randomly from the possible event types.
@@ -33,9 +36,11 @@ class EventFactory:
 
         match event_type:
             case EventType.PAGE_VIEW:
-                return self._create_page_view_event()
+                event = self._create_page_view_event()
             case _:
                 raise NotImplementedError()
+
+        return json.dumps(event)
 
     @cache
     def _get_pregenerated_user_ids(self) -> list[str]:
@@ -67,6 +72,21 @@ class EventFactory:
         }
 
 
+class DataSink:
+    def write(self, batch: Iterable[Any]) -> Any:
+        raise NotImplementedError()
+
+
+class StdoutDataSink(DataSink):
+    def write(self, batch: Iterable[Any]) -> Any:
+        for datum in batch:
+            print(datum)
+
+
 if __name__ == "__main__":
     event_factory = EventFactory()
-    print(event_factory.create_event())
+    data_sink = StdoutDataSink()
+    while True:
+        events = event_factory.create_random_events(10)
+        data_sink.write(events)
+        sleep(1)
