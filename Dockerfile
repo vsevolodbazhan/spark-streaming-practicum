@@ -12,4 +12,4 @@ FROM base AS producer
 COPY ./src/producer /app
 RUN uv sync --only-group producer
 
-ENTRYPOINT ["uv", "run", "generate_data.py"]
+ENTRYPOINT ["uv", "run", "python", "-m", "src.producer"]
