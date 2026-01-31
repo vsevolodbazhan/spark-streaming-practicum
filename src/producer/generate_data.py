@@ -1,3 +1,4 @@
+import argparse
 import json
 import random
 from datetime import datetime, timezone
@@ -84,9 +85,24 @@ class StdoutDataSink(DataSink):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog=Path(__file__).stem)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=10,
+        help="The number of events in a single batch.",
+    )
+    parser.add_argument(
+        "--sleep-between-batches-seconds",
+        type=int,
+        default=3,
+        help="Backoff time between batch generations.",
+    )
+    args = parser.parse_args()
+
     event_factory = EventFactory()
     data_sink = StdoutDataSink()
     while True:
-        events = event_factory.create_random_events(10)
+        events = event_factory.create_random_events(n=args.batch_size)
         data_sink.write(events)
-        sleep(1)
+        sleep(args.sleep_between_batches_seconds)
