@@ -12,5 +12,5 @@ wheels/
 # Ruff
 .ruff_cache
 
-# Local files
-.output
+# Local target
+target

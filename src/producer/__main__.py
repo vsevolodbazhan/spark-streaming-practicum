@@ -18,6 +18,8 @@ logger = structlog.getLogger()
 
 
 if __name__ == "__main__":
+    load_dotenv()
+
     parser = argparse.ArgumentParser(prog="producer")
     parser.add_argument(
         "--batch-size",
@@ -40,12 +42,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--local-file-output",
         type=str,
-        default=".output",
+        default=os.environ["PRODUCER_LOCAL_TARGET_DIR"],
         help="Output directory for local file sink.",
     )
     args = parser.parse_args()
-
-    load_dotenv()
 
     match data_sink_type := args.data_sink:
         case DataSinkType.STDOUT:
