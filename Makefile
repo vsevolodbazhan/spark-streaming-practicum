@@ -17,3 +17,6 @@ open: start
 
 logs:
 	docker compose logs
+
+duckdb:
+	docker compose run --rm duckdb

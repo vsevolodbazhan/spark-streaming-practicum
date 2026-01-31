@@ -59,6 +59,7 @@ if __name__ == "__main__":
                 access_key=os.environ["AWS_ACCESS_KEY_ID"],
                 secret_key=os.environ["AWS_SECRET_ACCESS_KEY"],
                 bucket=os.environ["AWS_BUCKET"],
+                prefix="events",
             )
         case _:
             raise NotImplementedError(f"Unsupported data sink type: {data_sink_type}")

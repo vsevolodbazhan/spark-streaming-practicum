@@ -1,6 +1,6 @@
 # Streaming Practicum
 
-Practice project to explore and implement streaming data ingestion patterns using Apache Spark Structured Streaming. The project is structured into three components: **producer** is a generator of artificial data implemented in Python, **ingestor** is a Spark Streaming–based data ingestion pipeline, **consumer** is a DuckDB-powered reader of ingested data. Storage is handled by S3-like MinIO.
+Practice project to explore and implement streaming data ingestion patterns using Apache Spark Structured Streaming. The project is structured into three components: **producer** is a generator of artificial data implemented in Python, **consumer** is a Spark Streaming–based data ingestion pipeline, **duckdb** is a DuckDB-powered reader of ingested data. Storage is handled by S3-like MinIO.
 
 ## Components
 
@@ -41,4 +41,18 @@ Note that it will not stop containers running MinIO, so you can still navigate t
 Stop and cleanup everything:
 ```
 make clean
+```
+
+Check logs using:
+```
+make logs
+```
+
+Create a container with DuckDB shell:
+```
+make duckdb
+```
+Raw events generate by the producer are available as `raw.events` view.
+```sql
+select * from raw.events limit 10;
 ```

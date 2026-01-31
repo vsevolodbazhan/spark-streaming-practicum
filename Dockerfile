@@ -3,6 +3,7 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS base
 
 ENV UV_LOCKED=1
 ENV UV_NO_DEV=1
+ENV UV_NO_CACHE=1
 
 COPY pyproject.toml uv.lock /app/
 WORKDIR /app
@@ -14,3 +15,10 @@ COPY ./src/producer/ ./src/producer
 RUN uv sync --only-group producer
 
 ENTRYPOINT ["uv", "run", "python", "-m", "src.producer"]
+
+
+FROM duckdb/duckdb:1.4.0 AS duckdb
+
+COPY src/duckdb/.duckdbrc ./
+
+ENTRYPOINT ["duckdb", "-init", ".duckdbrc"]

@@ -110,10 +110,12 @@ class S3DataSink(_FileDataSink):
         secret_key: str,
         region: str,
         bucket: str,
+        prefix: str,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self._bucket = bucket
+        self._prefix = prefix
         self._client = boto3.client(
             service_name="s3",
             region_name=region,
@@ -129,7 +131,7 @@ class S3DataSink(_FileDataSink):
         )
 
     def _write(self, serialized_batch: bytes) -> Any:
-        key = self._generate_file_name()
+        key = f"{self._prefix}/{self._generate_file_name()}"
         self._client.upload_fileobj(
             Fileobj=BytesIO(serialized_batch),
             Bucket=self._bucket,

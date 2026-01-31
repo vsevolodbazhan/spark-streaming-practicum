@@ -1,0 +1,12 @@
+INSTALL httpfs;
+LOAD httpfs;
+
+SET s3_region=getenv('AWS_REGION');
+SET s3_url_style='path';
+SET s3_endpoint='host.docker.internal' || ':' || getenv('MINIO_SERVER_PORT');
+SET s3_access_key_id=getenv('AWS_ACCESS_KEY_ID');
+SET s3_secret_access_key=getenv('AWS_SECRET_ACCESS_KEY');
+SET s3_use_ssl=false;
+
+create schema raw;
+create view raw.events as select * from read_json('s3://raw/events/*.json');
