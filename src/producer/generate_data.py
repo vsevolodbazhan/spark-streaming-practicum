@@ -20,6 +20,10 @@ class EventType(StrEnum):
 
 
 class EventFactory:
+    """
+    Factory that generates batches of random events.
+    """
+
     def create_random_events(self, n: int = 1) -> Iterator[str]:
         """
         Create a batch of random events.
@@ -73,12 +77,24 @@ class EventFactory:
         }
 
 
+class DataSinkType(StrEnum):
+    STDOUT = "stdout"
+
+
 class DataSink:
+    """
+    Abstract base class for data sinks.
+    """
+
     def write(self, batch: Iterable[Any]) -> Any:
         raise NotImplementedError()
 
 
 class StdoutDataSink(DataSink):
+    """
+    A data sink that prints batches to standard output.
+    """
+
     def write(self, batch: Iterable[Any]) -> Any:
         for datum in batch:
             print(datum)
@@ -98,10 +114,21 @@ if __name__ == "__main__":
         default=3,
         help="Backoff time between batch generations.",
     )
+    parser.add_argument(
+        "--data-sink",
+        choices=list(DataSinkType),
+        default=DataSinkType.STDOUT,
+        help="Data sink type.",
+    )
     args = parser.parse_args()
 
+    match data_sink_type := args.data_sink:
+        case DataSinkType.STDOUT:
+            data_sink = StdoutDataSink()
+        case _:
+            raise NotImplementedError(f"Unsupported data sink type: {data_sink_type}")
+
     event_factory = EventFactory()
-    data_sink = StdoutDataSink()
     while True:
         events = event_factory.create_random_events(n=args.batch_size)
         data_sink.write(events)
