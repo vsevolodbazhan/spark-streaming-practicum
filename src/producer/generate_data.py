@@ -1,18 +1,25 @@
 import argparse
 import json
+import os
 import random
+import sys
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import cache
+from io import BytesIO
 from pathlib import Path
 from time import sleep
 from typing import Any, Iterable, Iterator
 from uuid import uuid4
 
+import boto3
+import structlog
+from dotenv import load_dotenv
 from faker import Faker
 from rich import print
 
 fake = Faker()
+logger = structlog.getLogger()
 
 
 class EventType(StrEnum):
@@ -78,6 +85,7 @@ class EventFactory:
 class DataSinkType(StrEnum):
     STDOUT = "stdout"
     LOCAL_FILE = "local_file"
+    S3 = "s3"
 
 
 class DataSinkFormat(StrEnum):
@@ -96,9 +104,16 @@ class DataSink:
         match self._format:
             case DataSinkFormat.JSON:
                 batch = list(batch)
-                return json.dumps(batch).encode("utf-8")
+                serialized_batch = json.dumps(batch).encode("utf-8")
             case _:
                 raise NotImplementedError("Unsupported data format.")
+
+        logger.info(
+            "Serialized batch",
+            batch_size=sys.getsizeof(serialized_batch),
+            units="bytes",
+        )
+        return serialized_batch
 
     def _write(self, serialized_batch: bytes) -> Any:
         """
@@ -113,7 +128,7 @@ class DataSink:
 
 class StdoutDataSink(DataSink):
     """
-    A data sink that prints batches to standard output.
+    Prints data to standard output.
     """
 
     def __init__(self, **kwargs) -> None:
@@ -126,9 +141,14 @@ class StdoutDataSink(DataSink):
             print(datum)
 
 
-class LocalFileDataSink(DataSink):
+class _FileDataSink(DataSink):
+    def _generate_file_name(self) -> str:
+        return f"{uuid4()}.{self._format}"
+
+
+class LocalFileDataSink(_FileDataSink):
     """
-    A data sink that writes data as local files.
+    Write data as local files.
     """
 
     def __init__(self, *, output: Path, **kwargs) -> None:
@@ -141,7 +161,50 @@ class LocalFileDataSink(DataSink):
         self._output = output
 
     def _write(self, serialized_batch: bytes) -> Any:
-        (self._output / f"{uuid4()}.{self._format}").write_bytes(serialized_batch)
+        file = self._output / self._generate_file_name()
+        file.write_bytes(serialized_batch)
+        logger.info("Written batch to file", file=file)
+
+
+class S3DataSink(_FileDataSink):
+    """
+    Write data to S3 bucket.
+    """
+
+    def __init__(
+        self,
+        *,
+        endpoint_url: str,
+        access_key: str,
+        secret_key: str,
+        region: str,
+        bucket: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self._bucket = bucket
+        self._client = boto3.client(
+            service_name="s3",
+            region_name=region,
+            endpoint_url=endpoint_url,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+        )
+        logger.info(
+            "Set up sink",
+            endpoint_url=endpoint_url,
+            region=region,
+            bucket=bucket,
+        )
+
+    def _write(self, serialized_batch: bytes) -> Any:
+        key = self._generate_file_name()
+        self._client.upload_fileobj(
+            Fileobj=BytesIO(serialized_batch),
+            Bucket=self._bucket,
+            Key=key,
+        )
+        logger.info("Uploaded batch", bucket=self._bucket, key=key)
 
 
 if __name__ == "__main__":
@@ -172,11 +235,21 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    load_dotenv()
+
     match data_sink_type := args.data_sink:
         case DataSinkType.STDOUT:
             data_sink = StdoutDataSink()
         case DataSinkType.LOCAL_FILE:
             data_sink = LocalFileDataSink(output=Path(args.local_file_output))
+        case DataSinkType.S3:
+            data_sink = S3DataSink(
+                endpoint_url=f"http://localhost:{os.environ['MINIO_SERVER_PORT']}",
+                region=os.environ["AWS_REGION"],
+                access_key=os.environ["AWS_ACCESS_KEY_ID"],
+                secret_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+                bucket=os.environ["AWS_RAW_BUCKET"],
+            )
         case _:
             raise NotImplementedError(f"Unsupported data sink type: {data_sink_type}")
 
@@ -184,4 +257,6 @@ if __name__ == "__main__":
     while True:
         events = event_factory.create_random_events(n=args.batch_size)
         data_sink.sink(events)
-        sleep(args.sleep_between_batches_seconds)
+        sleep_duration = args.sleep_between_batches_seconds
+        logger.info("Sleeping", duration=sleep_duration, units="seconds")
+        sleep(sleep_duration)
