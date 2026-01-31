@@ -4,7 +4,11 @@ Practice project to explore and implement streaming data ingestion patterns usin
 
 ## Producer
 
-- Python script that generates events attributed to users.
+Python script that generates events attributed to users.
+
+Constraints:
 - User IDs are picked from a pre-generated list to simulate events from the same user.
-- The schema of messages is static.
-- Messages are always valid.
+- Events are of a single type with a static schema.
+- Events are always valid.
+- Events are never duplicated.
+- Events are never late.
