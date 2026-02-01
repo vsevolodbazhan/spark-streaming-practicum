@@ -49,8 +49,37 @@ services:
       AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
       AWS_BUCKET: $AWS_RAW_BUCKET
     command:
+      - --batch-size
+      - "100"
+      - --sleep-between-batches-seconds
+      - "15"
       - --data-sink
       - s3
+      - --target
+      - "$PRODUCER_S3_TARGET"
+    restart: on-failure
+    depends_on:
+      minio-create-buckets:
+        condition: service_completed_successfully
+
+  consumer:
+    build:
+      context: .
+      target: consumer
+    environment:
+      AWS_ENDPOINT_URL: $AWS_ENDPOINT_URL
+      AWS_REGION: $AWS_REGION
+      AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+      AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+    command:
+      - --data-source-sink
+      - s3
+      - --source-path
+      - "$CONSUMER_S3_SOURCE_PATH"
+      - --checkpoints-path
+      - "$CONSUMER_S3_CHECKPOINTS_PATH"
+      - --sink-path
+      - "$CONSUMER_S3_SINK_PATH"
     restart: on-failure
     depends_on:
       minio-create-buckets:
@@ -64,6 +93,8 @@ services:
       AWS_REGION: $AWS_REGION
       AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+      PRODUCER_S3_TARGET: $PRODUCER_S3_TARGET
+      CONSUMER_S3_SINK_PATH: $CONSUMER_S3_SINK_PATH
     build:
       context: .
       target: duckdb

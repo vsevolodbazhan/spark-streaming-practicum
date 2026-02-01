@@ -49,15 +49,11 @@ def create_s3_environment(
 ) -> ConsumerEnvironment:
     builder = SparkSession.builder.appName(SPARK_APP_NAME)
     builder = (
-        # TODO: Add packages during build time to avoid startup overhead.
-        builder.config(
-            "spark.jars.packages",
-            "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262",
-        )
-        .config("spark.hadoop.fs.s3a.access.key", aws_access_key_id)
+        builder.config("spark.hadoop.fs.s3a.access.key", aws_access_key_id)
         .config("spark.hadoop.fs.s3a.secret.key", aws_secret_access_key)
         .config("spark.hadoop.fs.s3a.endpoint", aws_endpoint_url)
         .config("spark.hadoop.fs.s3a.region", aws_region)
+        .config("spark.hadoop.fs.s3a.path.style.access", "true")
     )
     return ConsumerEnvironment(
         spark_session=builder.getOrCreate(),
@@ -68,9 +64,14 @@ def create_s3_environment(
 
 
 def start_stream(environment: ConsumerEnvironment) -> None:
+    def convert_path_to_string(path: Path) -> str:
+        if isinstance(path, S3Path):
+            return path.as_uri().replace("s3://", "s3a://")
+        return path.as_posix()
+
     (
         environment.spark_session.readStream.load(
-            path=str(environment.source_path),
+            path=convert_path_to_string(environment.source_path),
             format="json",
             schema=dedent(
                 """
@@ -90,10 +91,10 @@ def start_stream(environment: ConsumerEnvironment) -> None:
         )
         .writeStream.option(
             "checkpointLocation",
-            str(environment.checkpoints_path),
+            convert_path_to_string(environment.checkpoints_path),
         )
         .start(
-            path=str(environment.sink_path),
+            path=convert_path_to_string(environment.sink_path),
             format="parquet",
             outputMode="append",
         )
@@ -106,7 +107,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--data-source-sink-type",
+        "--data-source-sink",
         choices=list(DataSourceSinkType),
         default=DataSourceSinkType.LOCAL_FILE,
         help="Data source and sink type.",
@@ -114,29 +115,36 @@ if __name__ == "__main__":
     parser.add_argument(
         "--source-path",
         type=str,
-        required=True,
+        required=False,
         help="Local directory or S3 path to read data from.",
     )
     parser.add_argument(
         "--sink-path",
         type=str,
-        required=True,
+        required=False,
         help="Local directory or S3 path to output data to.",
     )
     parser.add_argument(
         "--checkpoints-path",
         type=str,
-        required=True,
+        required=False,
         help="Local directory or S3 path to save checkpoints to.",
     )
     args = parser.parse_args()
 
-    match data_source_sink_type := args.data_source_sink_type:
+    match data_source_sink := args.data_source_sink:
         case DataSourceSinkType.LOCAL_FILE:
             environment = create_local_file_environment(
-                source_path=Path(args.source_path),
-                checkpoints_path=Path(args.checkpoints_path),
-                sink_path=Path(args.sink_path),
+                source_path=Path(
+                    args.source_path or os.environ["CONSUMER_LOCAL_FILE_SOURCE_PATH"]
+                ),
+                checkpoints_path=Path(
+                    args.checkpoints_path
+                    or os.environ["CONSUMER_LOCAL_FILE_CHECKPOINTS_PATH"]
+                ),
+                sink_path=Path(
+                    args.sink_path or os.environ["CONSUMER_LOCAL_FILE_SINK_PATH"]
+                ),
             )
         case DataSourceSinkType.S3:
             environment = create_s3_environment(
@@ -144,13 +152,19 @@ if __name__ == "__main__":
                 aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
                 aws_endpoint_url=os.environ["AWS_ENDPOINT_URL"],
                 aws_region=os.environ["AWS_REGION"],
-                source_path=S3Path(args.source_path),
-                checkpoints_path=S3Path(args.checkpoints_path),
-                sink_path=S3Path(args.sink_path),
+                source_path=S3Path.from_uri(
+                    args.source_path or os.environ["CONSUMER_S3_SOURCE_PATH"]
+                ),
+                checkpoints_path=S3Path.from_uri(
+                    args.checkpoints_path or os.environ["CONSUMER_S3_CHECKPOINTS_PATH"]
+                ),
+                sink_path=S3Path.from_uri(
+                    args.sink_path or os.environ["CONSUMER_S3_SINK_PATH"]
+                ),
             )
         case _:
             raise NotImplementedError(
-                f"Unsupported data source/sink type: {data_source_sink_type}"
+                f"Unsupported data source/sink type: {data_source_sink}"
             )
 
     start_stream(environment)

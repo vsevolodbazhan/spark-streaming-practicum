@@ -42,7 +42,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target",
         type=str,
-        required=True,
+        required=False,
         help="Directory or prefix to output data to.",
     )
     args = parser.parse_args()
@@ -51,8 +51,9 @@ if __name__ == "__main__":
         case DataSinkType.STDOUT:
             data_sink = StdoutDataSink()
         case DataSinkType.LOCAL_FILE:
+            target = args.target or os.environ["PRODUCER_LOCAL_FILE_TARGET"]
             data_sink = LocalFileDataSink(
-                output=Path(args.target),
+                output=Path(target),
             )
         case DataSinkType.S3:
             data_sink = S3DataSink(
@@ -60,7 +61,7 @@ if __name__ == "__main__":
                 region=os.environ["AWS_REGION"],
                 access_key=os.environ["AWS_ACCESS_KEY_ID"],
                 secret_key=os.environ["AWS_SECRET_ACCESS_KEY"],
-                target=args.target,
+                target=args.target or os.environ["PRODUCER_S3_TARGET"],
             )
         case _:
             raise NotImplementedError(f"Unsupported data sink type: {data_sink_type}")

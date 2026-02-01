@@ -116,7 +116,7 @@ class S3DataSink(_FileDataSink):
         super().__init__(**kwargs)
 
         if not isinstance(target, S3Path):
-            target = S3Path(target)
+            target = S3Path.from_uri(target)
 
         self._bucket = target.bucket
         self._prefix = target.key

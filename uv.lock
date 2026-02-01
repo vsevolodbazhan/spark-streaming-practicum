@@ -286,6 +286,7 @@ source = { virtual = "." }
 [package.dev-dependencies]
 consumer = [
     { name = "pyspark" },
+    { name = "python-dotenv" },
     { name = "s3path" },
 ]
 dev = [
@@ -305,6 +306,7 @@ producer = [
 [package.metadata.requires-dev]
 consumer = [
     { name = "pyspark", specifier = ">=4.1.1" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "s3path", specifier = ">=0.6.5" },
 ]
 dev = [{ name = "boto3-stubs", extras = ["essential"], specifier = ">=1.42.39" }]
