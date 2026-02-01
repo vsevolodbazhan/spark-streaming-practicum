@@ -52,7 +52,7 @@ if __name__ == "__main__":
         help="Probability of a batch being corrupted ([0, 1]).",
     )
     parser.add_argument(
-        "--invalid-event-chance",
+        "--invalid-schema-chance",
         type=float,
         default=0,
         help="Probability of generating event with invalid schema ([0, 1]).",
@@ -84,7 +84,7 @@ if __name__ == "__main__":
             raise NotImplementedError(f"Unsupported data sink type: {data_sink_type}")
 
     event_factory = EventFactory(
-        invalid_event_chance=args.invalid_event_chance,
+        invalid_schema_chance=args.invalid_schema_chance,
     )
     while True:
         events = event_factory.create_random_events(n=args.batch_size)

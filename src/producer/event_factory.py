@@ -22,13 +22,13 @@ class EventFactory:
     Factory that generates batches of random events.
     """
 
-    def __init__(self, invalid_event_chance: float = 0) -> None:
-        if invalid_event_chance < 0 or invalid_event_chance > 1:
+    def __init__(self, invalid_schema_chance: float = 0) -> None:
+        if invalid_schema_chance < 0 or invalid_schema_chance > 1:
             raise ValueError("Invalid event chance value must be between 0 and 1.")
-        self._invalid_event_chance = invalid_event_chance
+        self._invalid_schema_chance = invalid_schema_chance
 
     def _should_create_invalid_event(self) -> bool:
-        return random.random() < self._invalid_event_chance
+        return random.random() < self._invalid_schema_chance
 
     def create_random_events(self, n: int = 1) -> Iterator[dict]:
         """
