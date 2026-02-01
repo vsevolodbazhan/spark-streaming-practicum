@@ -4,10 +4,14 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from textwrap import dedent
+from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 from s3path import S3Path
+
+if TYPE_CHECKING:
+    from pyspark.sql import DataFrame
 
 SPARK_APP_NAME = "consumer"
 
@@ -26,6 +30,7 @@ class ConsumerEnvironment:
     source_path: Path
     checkpoints_path: Path
     sink_path: Path
+    dead_letters_sink_path: Path
 
 
 def _get_base_spark_session_builder() -> SparkSession.Builder:
@@ -42,12 +47,14 @@ def create_local_file_environment(
     source_path: Path,
     checkpoints_path: Path,
     sink_path: Path,
+    dead_letters_sink_path: Path,
 ) -> ConsumerEnvironment:
     return ConsumerEnvironment(
         spark_session=_get_base_spark_session_builder().getOrCreate(),
         source_path=source_path,
         checkpoints_path=checkpoints_path,
         sink_path=sink_path,
+        dead_letters_sink_path=dead_letters_sink_path,
     )
 
 
@@ -59,6 +66,7 @@ def create_s3_environment(
     source_path: S3Path,
     checkpoints_path: S3Path,
     sink_path: S3Path,
+    dead_letters_sink_path: S3Path,
 ) -> ConsumerEnvironment:
     builder = (
         _get_base_spark_session_builder()
@@ -73,29 +81,53 @@ def create_s3_environment(
         source_path=source_path,
         checkpoints_path=checkpoints_path,
         sink_path=sink_path,
+        dead_letters_sink_path=dead_letters_sink_path,
     )
 
 
 def start_stream(environment: ConsumerEnvironment) -> None:
+    CORRUPT_RECORD_COLUMN = "_corrupt_record"
+
     def convert_path_to_string(path: Path) -> str:
         if isinstance(path, S3Path):
             # Enforce the use of s3a:// protocol (not s3://) for S3A filesystem connector.
             return path.as_uri().replace("s3://", "s3a://")
         return path.as_posix()
 
+    def process_batch(df: "DataFrame", batch_id: int) -> None:
+        # In PERMISSIVE mode Spark adds an additional string column
+        # that stores the batch as a string.
+        # If this column is not NULL, it means the batch is corrupted
+        # and should be sent to the Dead Letters queue.
+        valid_df = df.filter(f"{CORRUPT_RECORD_COLUMN} is null").drop(
+            CORRUPT_RECORD_COLUMN
+        )
+        corrupt_df = df.filter(f"{CORRUPT_RECORD_COLUMN} is not null")
+
+        for df, sink_path in [
+            (valid_df, environment.sink_path),
+            (corrupt_df, environment.dead_letters_sink_path),
+        ]:
+            if df.count() > 0:
+                df.write.mode("append").parquet(convert_path_to_string(sink_path))
+
     (
         environment.spark_session.readStream.load(
             path=convert_path_to_string(environment.source_path),
             format="json",
             schema=dedent(
-                """
+                f"""
                 user_id string,
                 event_id string,
                 event_timestamp timestamp,
                 event_type string,
-                properties map<string, string>
+                properties map<string, string>,
+                {CORRUPT_RECORD_COLUMN} string
                 """
             ),
+            # Allows corrupted records.
+            mode="PERMISSIVE",
+            columnNameOfCorruptRecord=CORRUPT_RECORD_COLUMN,
         )
         .selectExpr(
             "_metadata.file_path as _source",
@@ -107,11 +139,8 @@ def start_stream(environment: ConsumerEnvironment) -> None:
             "checkpointLocation",
             convert_path_to_string(environment.checkpoints_path),
         )
-        .start(
-            path=convert_path_to_string(environment.sink_path),
-            format="parquet",
-            outputMode="append",
-        )
+        .foreachBatch(process_batch)
+        .start()
         .awaitTermination()
     )
 
@@ -137,6 +166,12 @@ if __name__ == "__main__":
         help="Local directory or S3 path to output data to.",
     )
     parser.add_argument(
+        "--dead-letters-sink-path",
+        type=str,
+        required=False,
+        help="Local directory or S3 path to output corrupted data to.",
+    )
+    parser.add_argument(
         "--checkpoints-path",
         type=str,
         required=False,
@@ -157,6 +192,10 @@ if __name__ == "__main__":
                 sink_path=Path(
                     args.sink_path or os.environ["CONSUMER_LOCAL_FILE_SINK_PATH"]
                 ),
+                dead_letters_sink_path=Path(
+                    args.dead_letters_sink_path
+                    or os.environ["CONSUMER_LOCAL_FILE_DEAD_LETTERS_SINK_PATH"]
+                ),
             )
         case DataSourceSinkType.S3:
             environment = create_s3_environment(
@@ -172,6 +211,10 @@ if __name__ == "__main__":
                 ),
                 sink_path=S3Path.from_uri(
                     args.sink_path or os.environ["CONSUMER_S3_SINK_PATH"]
+                ),
+                dead_letters_sink_path=S3Path(
+                    args.dead_letters_sink_path
+                    or os.environ["CONSUMER_S3_DEAD_LETTERS_SINK_PATH"]
                 ),
             )
         case _:
