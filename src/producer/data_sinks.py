@@ -1,4 +1,5 @@
 import json
+import random
 import sys
 from enum import StrEnum
 from io import BytesIO
@@ -29,8 +30,16 @@ class DataSink:
     Base class for data sinks.
     """
 
-    def __init__(self, *, format: DataSinkFormat = DataSinkFormat.JSON) -> None:
+    def __init__(
+        self,
+        *,
+        format: DataSinkFormat = DataSinkFormat.JSON,
+        corruption_chance: float = 0,
+    ) -> None:
         self._format = format
+        if corruption_chance < 0 or corruption_chance > 1:
+            raise ValueError("Corruption chance value must be between 0 and 1.")
+        self._corruption_chance = corruption_chance
 
     def _serialize(self, batch: Iterable[dict]) -> bytes:
         match self._format:
@@ -47,6 +56,16 @@ class DataSink:
         )
         return serialized_batch
 
+    def _corrupt(self, serialized_batch: bytes) -> bytes:
+        """
+        Corrupt a serialized batch by truncating it mid-way.
+        """
+        midpoint = len(serialized_batch) // 2
+        return serialized_batch[:midpoint]
+
+    def _should_corrupt(self) -> bool:
+        return random.random() < self._corruption_chance
+
     def _write(self, serialized_batch: bytes) -> Any:
         """
         This method is designed to be implemented in subclasses.
@@ -55,6 +74,8 @@ class DataSink:
 
     def sink(self, batch: Iterable[dict]) -> Any:
         serialized_batch = self._serialize(batch)
+        if self._should_corrupt():
+            serialized_batch = self._corrupt(serialized_batch)
         self._write(serialized_batch)
 
 
@@ -67,6 +88,8 @@ class StdoutDataSink(DataSink):
         super().__init__(**kwargs)
         if self._format != DataSinkFormat.JSON:
             raise ValueError("Formats other than JSON are not supported by this sink.")
+        if self._corruption_chance > 0:
+            raise ValueError("This sink can not output corrupted data.")
 
     def _write(self, serialized_batch: bytes) -> Any:
         for datum in json.loads(serialized_batch):
