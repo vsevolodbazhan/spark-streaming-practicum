@@ -19,17 +19,19 @@ Python script that generates events attributed to users.
 - Events are being streamed to S3 in JSON format.
 - User IDs are picked from a pre-generated list to simulate events from the same user.
 - Events are of a single type with a static schema.
-- Events are always valid.
 - Events are never duplicated.
 - Events are never late.
+- **Events may have invalid schema.**
+- **Batches of events may be corrupted.**
 
 ### Consumer
 
 Python script that uses PySpark to process the producer stream.
 
-- Reads the JSON data.
-- Enforced schema.
-- Enriched with metadata.
+- Consumes raw batches of data.
+- **Handles corrupted batches by routing them to dead-letter queue.**
+- **Enforces schema. Routes records with invalid schema to dead-letter queue.**
+- Enriches with metadata.
 - Converts to Parquet.
 - Uses checkpointing to handle job restarts and enforce exactly-once semantics (on batch level).
 
@@ -37,8 +39,8 @@ Python script that uses PySpark to process the producer stream.
 
 DuckDB is used to explore the data. 
 
-- Raw JSON data can be accessed in `raw.events` table.
 - Processed bronze data can be queried though `bronze.events` table.
+- Dead-lettered records can be found in `dead_letters.events` table.
 
 ### MinIO
 
@@ -87,6 +89,6 @@ Create a container with DuckDB shell:
 make duckdb
 ```
 ```sql
-select * from raw.events;
 select * from bronze.events;
+select * from dead_letters.events;
 ```
