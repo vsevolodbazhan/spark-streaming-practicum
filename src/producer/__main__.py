@@ -40,10 +40,10 @@ if __name__ == "__main__":
         help="Data sink type.",
     )
     parser.add_argument(
-        "--local-file-output",
+        "--target",
         type=str,
-        default=os.environ["PRODUCER_LOCAL_TARGET_PATH"],
-        help="Output directory for local file sink.",
+        required=True,
+        help="Directory or prefix to output data to.",
     )
     args = parser.parse_args()
 
@@ -51,15 +51,16 @@ if __name__ == "__main__":
         case DataSinkType.STDOUT:
             data_sink = StdoutDataSink()
         case DataSinkType.LOCAL_FILE:
-            data_sink = LocalFileDataSink(output=Path(args.local_file_output))
+            data_sink = LocalFileDataSink(
+                output=Path(args.target),
+            )
         case DataSinkType.S3:
             data_sink = S3DataSink(
                 endpoint_url=os.environ["AWS_ENDPOINT_URL"],
                 region=os.environ["AWS_REGION"],
                 access_key=os.environ["AWS_ACCESS_KEY_ID"],
                 secret_key=os.environ["AWS_SECRET_ACCESS_KEY"],
-                bucket=os.environ["AWS_BUCKET"],
-                prefix="events",
+                target=args.target,
             )
         case _:
             raise NotImplementedError(f"Unsupported data sink type: {data_sink_type}")

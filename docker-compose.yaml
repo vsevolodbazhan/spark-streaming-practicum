@@ -30,7 +30,9 @@ services:
       - -c
       - |
         /usr/bin/mc alias set local http://minio:$MINIO_SERVER_PORT $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD;
-        /usr/bin/mc mb local/$AWS_PRODUCER_BUCKET;
+        /usr/bin/mc mb local/$AWS_RAW_BUCKET;
+        /usr/bin/mc mb local/$AWS_SPARK_BUCKET;
+        /usr/bin/mc mb local/$AWS_BRONZE_BUCKET;
         exit 0;
     depends_on:
       minio:
@@ -41,11 +43,11 @@ services:
       context: .
       target: producer
     environment:
-      AWS_ENDPOINT_URL: http://minio:$MINIO_SERVER_PORT
+      AWS_ENDPOINT_URL: $AWS_ENDPOINT_URL
       AWS_REGION: $AWS_REGION
       AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
-      AWS_BUCKET: $AWS_PRODUCER_BUCKET
+      AWS_BUCKET: $AWS_RAW_BUCKET
     command:
       - --data-sink
       - s3

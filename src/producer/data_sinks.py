@@ -9,6 +9,7 @@ from uuid import uuid4
 import boto3
 import structlog
 from rich import print
+from s3path import S3Path
 
 logger = structlog.getLogger()
 
@@ -109,13 +110,16 @@ class S3DataSink(_FileDataSink):
         access_key: str,
         secret_key: str,
         region: str,
-        bucket: str,
-        prefix: str,
+        target: str | S3Path,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self._bucket = bucket
-        self._prefix = prefix
+
+        if not isinstance(target, S3Path):
+            target = S3Path(target)
+
+        self._bucket = target.bucket
+        self._prefix = target.key
         self._client = boto3.client(
             service_name="s3",
             region_name=region,
@@ -127,7 +131,7 @@ class S3DataSink(_FileDataSink):
             "Set up sink",
             endpoint_url=endpoint_url,
             region=region,
-            bucket=bucket,
+            bucket=self._bucket,
         )
 
     def _write(self, serialized_batch: bytes) -> Any:

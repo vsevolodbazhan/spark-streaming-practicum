@@ -9,6 +9,7 @@ dependencies = []
 [dependency-groups]
 consumer = [
     "pyspark>=4.1.1",
+    "s3path>=0.6.5",
 ]
 dev = [
     "boto3-stubs[essential]>=1.42.39",
@@ -18,5 +19,6 @@ producer = [
     "faker>=40.1.2",
     "python-dotenv>=1.2.1",
     "rich>=14.3.1",
+    "s3path>=0.6.5",
     "structlog>=25.5.0",
 ]
