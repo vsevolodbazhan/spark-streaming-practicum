@@ -22,18 +22,31 @@ class EventFactory:
     Factory that generates batches of random events.
     """
 
+    def __init__(self, invalid_event_chance: float = 0) -> None:
+        if invalid_event_chance < 0 or invalid_event_chance > 1:
+            raise ValueError("Invalid event chance value must be between 0 and 1.")
+        self._invalid_event_chance = invalid_event_chance
+
+    def _should_create_invalid_event(self) -> bool:
+        return random.random() < self._invalid_event_chance
+
     def create_random_events(self, n: int = 1) -> Iterator[dict]:
         """
         Create a batch of random events.
         """
         for _ in range(n):
-            yield self.create_event()
+            yield self.create_event(invalid=self._should_create_invalid_event())
 
-    def create_event(self, event_type: EventType | None = None) -> dict:
+    def create_event(
+        self, event_type: EventType | None = None, invalid: bool = False
+    ) -> dict:
         """
         Create event. If the event type is not specified, it will be chosen
         randomly from the possible event types.
         """
+        if invalid is True:
+            return self._create_invalid_event()
+
         if event_type is None:
             event_type = random.choice(list(EventType))
 
@@ -64,6 +77,9 @@ class EventFactory:
         }
 
     def _create_page_view_event(self) -> dict:
+        """
+        Valid page-view like event.
+        """
         return self._create_event_scaffold() | {
             "event_type": str(EventType.PAGE_VIEW),
             "properties": {
@@ -71,3 +87,9 @@ class EventFactory:
                 "user_agent": fake.user_agent(),
             },
         }
+
+    def _create_invalid_event(self) -> dict:
+        """
+        Invalid event with random column with random value.
+        """
+        return {fake.pystr(): fake.pystr()}
