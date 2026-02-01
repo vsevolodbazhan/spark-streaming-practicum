@@ -66,6 +66,7 @@ def create_s3_environment(
         .config("spark.hadoop.fs.s3a.secret.key", aws_secret_access_key)
         .config("spark.hadoop.fs.s3a.endpoint", aws_endpoint_url)
         .config("spark.hadoop.fs.s3a.region", aws_region)
+        .config("spark.hadoop.fs.s3a.path.style.access", "true")
     )
     return ConsumerEnvironment(
         spark_session=builder.getOrCreate(),
