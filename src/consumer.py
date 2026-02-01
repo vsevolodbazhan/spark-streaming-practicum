@@ -85,7 +85,7 @@ def create_s3_environment(
 
 
 def start_stream(environment: ConsumerEnvironment) -> None:
-    from pyspark.sql.functions import coalesce, col, explode_outer, from_json, lit
+    from pyspark.sql.functions import coalesce, col, explode_outer, from_json, lit, when
     from pyspark.sql.types import (
         ArrayType,
         MapType,
@@ -115,8 +115,10 @@ def start_stream(environment: ConsumerEnvironment) -> None:
     required_columns = [field.name for field in schema.fields if not field.nullable]
     raw_record_column = "_raw_record"
     raw_batch_column = "_raw_batch"
+    is_corrupted_batch_column = "_is_corrupted_batch"
+    dead_letter_reason_column = "_dead_letter_reason"
 
-    def process_batch(data_frame: "DataFrame", batch_id: int) -> None:
+    def route_to_sinks(data_frame: "DataFrame", batch_id: int) -> None:
         # Build filter condition.
         has_all_required_columns = lit(True)
         for required_column in required_columns:
@@ -124,10 +126,21 @@ def start_stream(environment: ConsumerEnvironment) -> None:
                 has_all_required_columns & col(required_column).isNotNull()
             )
 
-        # Records are valid if all required fields are not null.
-        valid_df = data_frame.filter(has_all_required_columns).drop(raw_record_column)
-        # Records are invalid if any required field is null.
-        invalid_df = data_frame.filter(~has_all_required_columns)
+        # Determine reason for dead lettering.
+        df_with_reason = data_frame.withColumn(
+            dead_letter_reason_column,
+            when(col(is_corrupted_batch_column), lit("corrupted_batch"))
+            .when(~has_all_required_columns, lit("invalid_schema"))
+            .otherwise(lit(None)),
+        ).drop(is_corrupted_batch_column)
+
+        # Records are valid if there is no dead letter reason.
+        valid_df = df_with_reason.filter(col(dead_letter_reason_column).isNull()).drop(
+            raw_record_column,
+            dead_letter_reason_column,
+        )
+        # Records are invalid if they have a dead letter reason.
+        invalid_df = df_with_reason.filter(col(dead_letter_reason_column).isNotNull())
 
         # Route batches between valid and dead letters sink.
         for batch_df, sink_path in [
@@ -157,6 +170,8 @@ def start_stream(environment: ConsumerEnvironment) -> None:
                 raw_record_column
             ),  # Explode array for raw recrods into individual records.
         )
+        # Track if batch was corrupted (exploded array is null).
+        .withColumn(is_corrupted_batch_column, col(raw_record_column).isNull())
         # For corrupted batches, use the raw batch as the raw record.
         .withColumn(
             raw_record_column,
@@ -170,8 +185,9 @@ def start_stream(environment: ConsumerEnvironment) -> None:
             "_metadata.file_path as _source",
             "_metadata.file_modification_time as _source_updated_at",
             "current_timestamp() as _batch_processed_at",
-            # Keep raw record column for dead letters.
+            # Keep the raw record and the indicator of batch corruption.
             raw_record_column,
+            is_corrupted_batch_column,
             # Add all parsed fields.
             "parsed.*",
         )
@@ -180,7 +196,7 @@ def start_stream(environment: ConsumerEnvironment) -> None:
             "checkpointLocation",
             convert_path_to_string(environment.checkpoints_path),
         )
-        .foreachBatch(process_batch)
+        .foreachBatch(route_to_sinks)
         .start()
         .awaitTermination()
     )
