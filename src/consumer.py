@@ -12,6 +12,9 @@ from s3path import S3Path
 SPARK_APP_NAME = "consumer"
 
 
+load_dotenv()
+
+
 class DataSourceSinkType(StrEnum):
     LOCAL_FILE = "local_file"
     S3 = "s3"
@@ -25,13 +28,22 @@ class ConsumerEnvironment:
     sink_path: Path
 
 
+def _get_base_spark_session_builder() -> SparkSession.Builder:
+    return (
+        SparkSession.builder.appName(SPARK_APP_NAME)
+        .config("spark.ui.port", str(os.environ["CONSUMER_SPARK_UI_PORT"]))
+        .config("spark.ui.host", "0.0.0.0")
+        .config("spark.ui.enabled", "true")
+    )
+
+
 def create_local_file_environment(
     source_path: Path,
     checkpoints_path: Path,
     sink_path: Path,
 ) -> ConsumerEnvironment:
     return ConsumerEnvironment(
-        spark_session=SparkSession.builder.appName(SPARK_APP_NAME).getOrCreate(),
+        spark_session=_get_base_spark_session_builder().getOrCreate(),
         source_path=source_path,
         checkpoints_path=checkpoints_path,
         sink_path=sink_path,
@@ -47,9 +59,9 @@ def create_s3_environment(
     checkpoints_path: S3Path,
     sink_path: S3Path,
 ) -> ConsumerEnvironment:
-    builder = SparkSession.builder.appName(SPARK_APP_NAME)
     builder = (
-        builder.config("spark.hadoop.fs.s3a.access.key", aws_access_key_id)
+        _get_base_spark_session_builder()
+        .config("spark.hadoop.fs.s3a.access.key", aws_access_key_id)
         .config("spark.hadoop.fs.s3a.secret.key", aws_secret_access_key)
         .config("spark.hadoop.fs.s3a.endpoint", aws_endpoint_url)
         .config("spark.hadoop.fs.s3a.region", aws_region)
@@ -103,8 +115,6 @@ def start_stream(environment: ConsumerEnvironment) -> None:
 
 
 if __name__ == "__main__":
-    load_dotenv()
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data-source-sink",

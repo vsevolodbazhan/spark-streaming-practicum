@@ -71,6 +71,9 @@ services:
       AWS_REGION: $AWS_REGION
       AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+      CONSUMER_SPARK_UI_PORT: $CONSUMER_SPARK_UI_PORT
+    ports:
+      - $CONSUMER_SPARK_UI_PORT:$CONSUMER_SPARK_UI_PORT
     command:
       - --data-source-sink
       - s3

@@ -20,3 +20,6 @@ minio: start
 
 duckdb:
 	docker compose run --rm duckdb
+
+spark:
+	open http://localhost:${CONSUMER_SPARK_UI_PORT}
