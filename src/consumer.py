@@ -3,7 +3,6 @@ import os
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from textwrap import dedent
 from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
@@ -86,7 +85,15 @@ def create_s3_environment(
 
 
 def start_stream(environment: ConsumerEnvironment) -> None:
-    CORRUPT_RECORD_COLUMN = "_corrupt_record"
+    from pyspark.sql.functions import coalesce, col, explode_outer, from_json, lit
+    from pyspark.sql.types import (
+        ArrayType,
+        MapType,
+        StringType,
+        StructField,
+        StructType,
+        TimestampType,
+    )
 
     def convert_path_to_string(path: Path) -> str:
         if isinstance(path, S3Path):
@@ -94,47 +101,81 @@ def start_stream(environment: ConsumerEnvironment) -> None:
             return path.as_uri().replace("s3://", "s3a://")
         return path.as_posix()
 
-    def process_batch(df: "DataFrame", batch_id: int) -> None:
-        # In PERMISSIVE mode Spark adds an additional string column
-        # that stores the batch as a string.
-        # If this column is not NULL, it means the batch is corrupted
-        # and should be sent to the Dead Letters queue.
-        valid_df = df.filter(f"{CORRUPT_RECORD_COLUMN} is null").drop(
-            CORRUPT_RECORD_COLUMN
-        )
-        corrupt_df = df.filter(f"{CORRUPT_RECORD_COLUMN} is not null")
+    schema = StructType(
+        [
+            StructField("user_id", StringType(), nullable=False),
+            StructField("event_id", StringType(), nullable=False),
+            StructField("event_timestamp", TimestampType(), nullable=False),
+            StructField("event_type", StringType(), nullable=False),
+            StructField(
+                "properties", MapType(StringType(), StringType()), nullable=True
+            ),
+        ]
+    )
+    required_columns = [field.name for field in schema.fields if not field.nullable]
+    raw_record_column = "_raw_record"
+    raw_batch_column = "_raw_batch"
 
-        for df, sink_path in [
+    def process_batch(data_frame: "DataFrame", batch_id: int) -> None:
+        # Build filter condition.
+        has_all_required_columns = lit(True)
+        for required_column in required_columns:
+            has_all_required_columns = (
+                has_all_required_columns & col(required_column).isNotNull()
+            )
+
+        # Records are valid if all required fields are not null.
+        valid_df = data_frame.filter(has_all_required_columns).drop(raw_record_column)
+        # Records are invalid if any required field is null.
+        invalid_df = data_frame.filter(~has_all_required_columns)
+
+        # Route batches between valid and dead letters sink.
+        for batch_df, sink_path in [
             (valid_df, environment.sink_path),
-            (corrupt_df, environment.dead_letters_sink_path),
+            (invalid_df, environment.dead_letters_sink_path),
         ]:
-            if df.count() > 0:
-                df.write.mode("append").parquet(convert_path_to_string(sink_path))
+            if batch_df.count() > 0:
+                batch_df.write.mode("append").parquet(convert_path_to_string(sink_path))
 
     (
         environment.spark_session.readStream.load(
             path=convert_path_to_string(environment.source_path),
-            format="json",
-            schema=dedent(
-                f"""
-                user_id string,
-                event_id string,
-                event_timestamp timestamp,
-                event_type string,
-                properties map<string, string>,
-                {CORRUPT_RECORD_COLUMN} string
-                """
-            ),
-            # Allows corrupted records.
-            mode="PERMISSIVE",
-            columnNameOfCorruptRecord=CORRUPT_RECORD_COLUMN,
+            # Read batch as is.
+            format="text",
         )
+        # First, explode array into raw JSON strings.
+        # Use explode_outer to keep rows where parsing failed.
+        # That allows to keep corrupted batches.
+        .withColumn(
+            # Parse value into an array to raw string records.
+            "raw_records_array",
+            from_json(col("value"), ArrayType(StringType())),
+        )
+        .select(
+            col("value").alias(raw_batch_column),  # Keep original batch value.
+            explode_outer("raw_records_array").alias(
+                raw_record_column
+            ),  # Explode array for raw recrods into individual records.
+        )
+        # For corrupted batches, use the raw batch as the raw record.
+        .withColumn(
+            raw_record_column,
+            coalesce(raw_record_column, raw_batch_column),
+        )
+        .drop(raw_batch_column)
+        # Parse each raw record as a JSON.
+        .withColumn("parsed", from_json(raw_record_column, schema))
         .selectExpr(
+            # Include metadata.
             "_metadata.file_path as _source",
             "_metadata.file_modification_time as _source_updated_at",
             "current_timestamp() as _batch_processed_at",
-            "*",
+            # Keep raw record column for dead letters.
+            raw_record_column,
+            # Add all parsed fields.
+            "parsed.*",
         )
+        # Set up checkpointing.
         .writeStream.option(
             "checkpointLocation",
             convert_path_to_string(environment.checkpoints_path),
