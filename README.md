@@ -2,6 +2,14 @@
 
 Practice project to explore and implement streaming data ingestion patterns using Apache Spark Structured Streaming. The project is structured into three components: **producer** is a generator of artificial data implemented in Python, **consumer** is a Spark Streaming–based data ingestion pipeline, **duckdb** is a DuckDB-powered reader of ingested data. Storage is handled by S3-like MinIO.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/architecture-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="diagrams/architecture-light.png">
+  <img src="diagrams/architecture-light.png">
+</picture>
+
+![](diagrams/architecture.png)
+
 ## Components
 
 ### Producer
@@ -23,7 +31,7 @@ Python script that uses PySpark to process the producer stream.
 - Enforced schema.
 - Enriched with metadata.
 - Converts to Parquet.
-- Uses checkpointing to handle job restarts and enforce exactly-once semantics.
+- Uses checkpointing to handle job restarts and enforce exactly-once semantics (on batch level).
 
 ### DuckDB
 
