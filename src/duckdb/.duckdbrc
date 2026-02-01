@@ -1,13 +1,19 @@
+-- Install and load httpfs extension for S3 access.
 INSTALL httpfs;
 LOAD httpfs;
 
+-- Configure S3 connection to MinIO.
+-- Uses path-style URLs (endpoint/bucket) instead of virtual-hosted (bucket.endpoint).
 SET s3_region=getenv('AWS_REGION');
 SET s3_url_style='path';
+-- host.docker.internal resolves to the Docker host, allowing access to MinIO
+-- via the host-mapped port rather than the internal Docker network.
 SET s3_endpoint='host.docker.internal' || ':' || getenv('MINIO_SERVER_PORT');
 SET s3_access_key_id=getenv('AWS_ACCESS_KEY_ID');
 SET s3_secret_access_key=getenv('AWS_SECRET_ACCESS_KEY');
 SET s3_use_ssl=false;
 
+-- Create views for convenient data access.
 create schema raw;
 create view raw.events as select * from read_json(getenv('PRODUCER_S3_TARGET') || '/*.json');
 

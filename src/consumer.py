@@ -32,6 +32,7 @@ def _get_base_spark_session_builder() -> SparkSession.Builder:
     return (
         SparkSession.builder.appName(SPARK_APP_NAME)
         .config("spark.ui.port", str(os.environ["CONSUMER_SPARK_UI_PORT"]))
+        # Bind to all interfaces to make UI accessible from outside the container.
         .config("spark.ui.host", "0.0.0.0")
         .config("spark.ui.enabled", "true")
     )
@@ -65,7 +66,6 @@ def create_s3_environment(
         .config("spark.hadoop.fs.s3a.secret.key", aws_secret_access_key)
         .config("spark.hadoop.fs.s3a.endpoint", aws_endpoint_url)
         .config("spark.hadoop.fs.s3a.region", aws_region)
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
     )
     return ConsumerEnvironment(
         spark_session=builder.getOrCreate(),
@@ -78,6 +78,7 @@ def create_s3_environment(
 def start_stream(environment: ConsumerEnvironment) -> None:
     def convert_path_to_string(path: Path) -> str:
         if isinstance(path, S3Path):
+            # Enforce the use of s3a:// protocol (not s3://) for S3A filesystem connector.
             return path.as_uri().replace("s3://", "s3a://")
         return path.as_posix()
 
