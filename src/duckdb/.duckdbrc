@@ -14,8 +14,8 @@ SET s3_secret_access_key=getenv('AWS_SECRET_ACCESS_KEY');
 SET s3_use_ssl=false;
 
 -- Create views for convenient data access.
-create schema raw;
-create view raw.events as select * from read_json(getenv('PRODUCER_S3_TARGET') || '/*.json');
-
 create schema bronze;
 create view bronze.events as select * from read_parquet(getenv('CONSUMER_S3_SINK_PATH') || '/*.parquet');
+
+create schema dead_letters;
+create view dead_letters.events as select * from read_parquet(getenv('CONSUMER_S3_DEAD_LETTERS_SINK_PATH') || '/*.parquet');

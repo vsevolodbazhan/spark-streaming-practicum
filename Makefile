@@ -10,7 +10,7 @@ stop:
 	docker compose stop producer
 
 clean: stop
-	docker compose down --volumes --remove-orphans
+	docker compose down --volumes --remove-orphans --rmi local
 
 logs:
 	docker compose logs

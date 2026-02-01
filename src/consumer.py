@@ -308,7 +308,7 @@ if __name__ == "__main__":
                 sink_path=S3Path.from_uri(
                     args.sink_path or os.environ["CONSUMER_S3_SINK_PATH"]
                 ),
-                dead_letters_sink_path=S3Path(
+                dead_letters_sink_path=S3Path.from_uri(
                     args.dead_letters_sink_path
                     or os.environ["CONSUMER_S3_DEAD_LETTERS_SINK_PATH"]
                 ),

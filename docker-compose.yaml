@@ -53,11 +53,15 @@ services:
       - --batch-size
       - "100"
       - --sleep-between-batches-seconds
-      - "15"
+      - "10"
       - --data-sink
       - s3
       - --target
       - "$PRODUCER_S3_TARGET"
+      - --corruption-chance
+      - "0.1"
+      - --invalid-schema-chance
+      - "0.1"
     restart: on-failure
     depends_on:
       minio-create-buckets:
@@ -84,6 +88,8 @@ services:
       - "$CONSUMER_S3_CHECKPOINTS_PATH"
       - --sink-path
       - "$CONSUMER_S3_SINK_PATH"
+      - --dead-letters-sink-path
+      - "$CONSUMER_S3_DEAD_LETTERS_SINK_PATH"
     restart: on-failure
     depends_on:
       minio-create-buckets:
@@ -99,6 +105,7 @@ services:
       AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
       PRODUCER_S3_TARGET: $PRODUCER_S3_TARGET
       CONSUMER_S3_SINK_PATH: $CONSUMER_S3_SINK_PATH
+      CONSUMER_S3_DEAD_LETTERS_SINK_PATH: $CONSUMER_S3_DEAD_LETTERS_SINK_PATH
     build:
       context: .
       target: duckdb
