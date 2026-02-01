@@ -7,29 +7,31 @@ from pyspark.sql import SparkSession
 
 load_dotenv()
 
-CONSUMER_TARGET_DIR = Path(os.environ["CONSUMER_LOCAL_TARGET_DIR"])
+PRODUCER_TARGET = Path(os.environ["PRODUCER_LOCAL_TARGET_PATH"])
+CONSUMER_TARGET = Path(os.environ["CONSUMER_LOCAL_TARGET_PATH"])
 
-spark = SparkSession.builder.appName("consumer").getOrCreate()
-input = spark.readStream.load(
-    path="target/producer/output",
-    format="json",
-    schema=dedent(
-        """
-        user_id string,
-        event_id string,
-        event_timestamp timestamp,
-        event_type string,
-        properties map<string, string>
-        """
-    ),
-)
-query = (
-    input.writeStream.option(
+(
+    SparkSession.builder.appName("consumer")
+    .getOrCreate()
+    .readStream.load(
+        path=PRODUCER_TARGET.as_posix(),
+        format="json",
+        schema=dedent(
+            """
+            user_id string,
+            event_id string,
+            event_timestamp timestamp,
+            event_type string,
+            properties map<string, string>
+            """
+        ),
+    )
+    .writeStream.option(
         "checkpointLocation",
-        (CONSUMER_TARGET_DIR / "checkpoints").as_posix(),
+        (CONSUMER_TARGET / "checkpoints").as_posix(),
     )
     .start(
-        path=(CONSUMER_TARGET_DIR / "output").as_posix(),
+        path=(CONSUMER_TARGET / "output").as_posix(),
         format="parquet",
         outputMode="append",
     )

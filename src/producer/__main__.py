@@ -42,7 +42,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--local-file-output",
         type=str,
-        default=os.environ["PRODUCER_LOCAL_TARGET_DIR"],
+        default=os.environ["PRODUCER_LOCAL_TARGET_PATH"],
         help="Output directory for local file sink.",
     )
     args = parser.parse_args()
