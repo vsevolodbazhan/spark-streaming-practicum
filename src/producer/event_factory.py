@@ -17,28 +17,48 @@ class EventType(StrEnum):
     PAGE_VIEW = "page_view"
 
 
+def _validate_chance_value(value: float) -> None:
+    if value < 0 or value > 1:
+        raise ValueError(f"Chance value must be between 0 and 1: {value}")
+
+
 class EventFactory:
     """
     Factory that generates batches of random events.
     """
 
-    def __init__(self, invalid_schema_chance: float = 0) -> None:
-        if invalid_schema_chance < 0 or invalid_schema_chance > 1:
-            raise ValueError("Invalid event chance value must be between 0 and 1.")
+    def __init__(
+        self,
+        invalid_schema_chance: float = 0,
+        duplicate_chance: float = 0,
+    ) -> None:
+        _validate_chance_value(invalid_schema_chance)
+        _validate_chance_value(duplicate_chance)
         self._invalid_schema_chance = invalid_schema_chance
+        self._duplicate_chance = duplicate_chance
+        self._saved_event: dict | None = None
 
     def _should_create_invalid_event(self) -> bool:
         return random.random() < self._invalid_schema_chance
+
+    def _should_create_duplicated_event(self) -> bool:
+        return random.random() < self._duplicate_chance
 
     def create_random_events(self, n: int = 1) -> Iterator[dict]:
         """
         Create a batch of random events.
         """
         for _ in range(n):
-            yield self.create_event(invalid=self._should_create_invalid_event())
+            yield self.create_event(
+                invalid=self._should_create_invalid_event(),
+                duplicate=self._should_create_duplicated_event(),
+            )
 
     def create_event(
-        self, event_type: EventType | None = None, invalid: bool = False
+        self,
+        event_type: EventType | None = None,
+        invalid: bool = False,
+        duplicate: bool = False,
     ) -> dict:
         """
         Create event. If the event type is not specified, it will be chosen
@@ -47,14 +67,20 @@ class EventFactory:
         if invalid is True:
             return self._create_invalid_event()
 
+        if duplicate is True and self._saved_event is not None:
+            return self._saved_event
+
         if event_type is None:
             event_type = random.choice(list(EventType))
 
         match event_type:
             case EventType.PAGE_VIEW:
-                return self._create_page_view_event()
+                event = self._create_page_view_event()
             case _:
                 raise NotImplementedError()
+
+        self._saved_event = event
+        return event
 
     @cache
     def _get_pregenerated_user_ids(self) -> list[str]:

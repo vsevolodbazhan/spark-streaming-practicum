@@ -57,6 +57,12 @@ if __name__ == "__main__":
         default=0,
         help="Probability of generating event with invalid schema ([0, 1]).",
     )
+    parser.add_argument(
+        "--duplicate-chance",
+        type=float,
+        default=0,
+        help="Probability of generating duplicated event ([0, 1]).",
+    )
     args = parser.parse_args()
 
     common_data_sinks_arguments = {
@@ -85,6 +91,7 @@ if __name__ == "__main__":
 
     event_factory = EventFactory(
         invalid_schema_chance=args.invalid_schema_chance,
+        duplicate_chance=args.duplicate_chance,
     )
     while True:
         events = event_factory.create_random_events(n=args.batch_size)
