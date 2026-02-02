@@ -45,7 +45,7 @@ class BatchParser:
 
     RAW_BATCH_COLUMN_NAME = "_raw_batch"
     RAW_RECORD_COLUMN_NAME = "_raw_record"
-    IS_CORRUPTED_BATCH_COLUMN_NAME = "_is_currupted_batch"
+    IS_CORRUPTED_BATCH_COLUMN_NAME = "_is_corrupted_batch"
     HAS_EXTRA_FIELDS_COLUMN_NAME = "_has_extra_fields"
     PARSED_RECORD_COLUMN_NAME = "_parsed_record"
 
