@@ -12,8 +12,11 @@ stop:
 clean: stop
 	docker compose down --volumes --remove-orphans --rmi local
 
-logs:
-	docker compose logs
+producer-logs:
+	docker compose logs producer
+
+consumer-logs:
+	docker compose logs consumer
 
 minio: start
 	open http://localhost:${MINIO_CONSOLE_PORT}

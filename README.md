@@ -12,6 +12,8 @@ Practice project to explore and implement streaming data ingestion patterns usin
 
 ## Components
 
+![](demos/setup.gif)
+
 ### Producer
 
 Python script that generates events attributed to users.
@@ -39,6 +41,8 @@ Python script that uses PySpark to process the producer stream.
 - Uses checkpointing to handle job restarts and enforce exactly-once semantics (on batch level).
 
 ### DuckDB
+
+![](demos/duckdb.gif)
 
 DuckDB is used to explore the data. 
 
@@ -113,7 +117,8 @@ make clean
 
 Check logs using:
 ```
-make logs
+make producer-logs
+make consumer-logs
 ```
 
 Open Spark UI in the default browser:
