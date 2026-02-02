@@ -1,23 +1,11 @@
-from enum import StrEnum
 from pathlib import Path
+from typing import Self
 
 from pyspark.errors import AnalysisException
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import Column, DataFrame, SparkSession
 from s3path import S3Path
 
 from .utilities import convert_path_to_string
-
-
-class DataSinkMode(StrEnum):
-    """Write mode for data sinks."""
-
-    APPEND = "append"
-
-
-class DataSinkFormat(StrEnum):
-    """Output format for data sinks."""
-
-    PARQUET = "parquet"
 
 
 class DataSink:
@@ -46,16 +34,10 @@ class LocalDataSink(DataSink):
         Write mode (e.g., append).
     """
 
-    def __init__(
-        self,
-        path: Path,
-        *,
-        format: DataSinkFormat = DataSinkFormat.PARQUET,
-        mode: DataSinkMode = DataSinkMode.APPEND,
-    ) -> None:
+    def __init__(self, path: Path) -> None:
         self._path = path
-        self._format = format
-        self._mode = mode
+        self._format = "parquet"
+        self._mode = "append"
 
     def write(self, batch: DataFrame) -> None:
         batch.write.save(
@@ -97,9 +79,9 @@ class IcebergDataSink(DataSink):
     """
 
     def __init__(self, table_name: str) -> None:
-        print(table_name)
         self._table_name = table_name
         self._table_exists: bool | None = None
+        self._partitioned_by: Column | None
 
     def _ensure_namespace_exists(self, session: SparkSession) -> None:
         """Create the namespace if it doesn't exist."""
@@ -118,13 +100,23 @@ class IcebergDataSink(DataSink):
         except AnalysisException:
             return False
 
+    def with_partitioned_by(self, _partitioned_by: Column | None) -> Self:
+        """
+        Set partioning predicate.
+        """
+        self._partitioned_by = _partitioned_by
+        return self
+
     def write(self, batch: DataFrame) -> None:
         if self._table_exists is None:
             self._table_exists = self._does_table_exist(batch.sparkSession)
 
         if not self._table_exists:
             self._ensure_namespace_exists(batch.sparkSession)
-            batch.writeTo(self._table_name).using("iceberg").create()
+            writer = batch.writeTo(self._table_name).using("iceberg")
+            if self._partitioned_by is not None:
+                writer.partitionedBy(self._partitioned_by)
+            writer.create()
             self._table_exists = True
         else:
             # mergeSchema option enables schema evolution.

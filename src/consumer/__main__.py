@@ -4,6 +4,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pyspark.sql.functions import col, days
 from pyspark.sql.types import (
     MapType,
     StringType,
@@ -111,8 +112,12 @@ if __name__ == "__main__":
     stream_processor = StreamProcessor(
         session_builder.build(),
         source=data_source,
-        sink=data_sink,
         dead_letters_sink=dead_letters_sink,
+        sink=(
+            data_sink.with_partitioned_by(days(col("event_timestamp")))
+            if isinstance(data_sink, IcebergDataSink)
+            else data_sink
+        ),
         parser=JsonArrayBatchParser(
             parsed_record_schema=StructType(
                 [
