@@ -1,6 +1,9 @@
+from pathlib import Path
 from typing import Self
 
 from pyspark.sql import SparkSession
+
+from .utilities import convert_path_to_string
 
 
 class SessionBuilder:
@@ -42,7 +45,6 @@ class SessionBuilder:
         """
         self._builder = (
             self._builder.config("spark.ui.port", str(port))
-            # Bind to all interfaces to make UI accessible from outside the container.
             .config("spark.ui.host", "0.0.0.0")
             .config("spark.ui.enabled", "true")
         )
@@ -75,6 +77,41 @@ class SessionBuilder:
             .config("spark.hadoop.fs.s3a.endpoint", aws_endpoint_url)
             .config("spark.hadoop.fs.s3a.region", aws_region)
             .config("spark.hadoop.fs.s3a.path.style.access", "true")
+        )
+        return self
+
+    def with_iceberg(
+        self,
+        catalog_name: str,
+        warehouse_path: Path,
+    ) -> Self:
+        """
+        Configure Iceberg with a Hadoop catalog stored on S3.
+
+        Parameters
+        ----------
+        catalog_name
+            Name for the Iceberg catalog (used in SQL as `catalog_name.db.table`).
+        warehouse_path
+            S3 path for the Iceberg warehouse.
+        """
+        self._builder = (
+            self._builder.config(
+                "spark.sql.extensions",
+                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+            )
+            .config(
+                f"spark.sql.catalog.{catalog_name}",
+                "org.apache.iceberg.spark.SparkCatalog",
+            )
+            .config(
+                f"spark.sql.catalog.{catalog_name}.type",
+                "hadoop",
+            )
+            .config(
+                f"spark.sql.catalog.{catalog_name}.warehouse",
+                convert_path_to_string(warehouse_path),
+            )
         )
         return self
 

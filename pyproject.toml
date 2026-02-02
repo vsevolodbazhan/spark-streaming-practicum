@@ -1,14 +1,14 @@
 [project]
 name = "streaming-practicum"
 version = "0.1.0"
-description = "Add your description here"
+description = "Practice project to explore and implement streaming data ingestion patterns using Apache Spark Structured Streaming."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = []
 
 [dependency-groups]
 consumer = [
-    "pyspark>=4.1.1",
+    "pyspark>=3.5.0,<3.6.0",
     "python-dotenv>=1.2.1",
     "s3path>=0.6.5",
 ]

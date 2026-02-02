@@ -14,7 +14,7 @@ from pyspark.sql.types import (
 from s3path import S3Path
 
 from .batch_parsers import JsonArrayBatchParser
-from .data_sinks import LocalFileDataSink, S3DataSink
+from .data_sinks import IcebergDataSink, LocalDataSink, S3DataSink
 from .data_sources import LocalFileDataSource, S3DataSource
 from .session_builder import SessionBuilder
 from .stream_processor import StreamProcessor
@@ -28,6 +28,7 @@ class DataSourceType(StrEnum):
 class DataSinkType(StrEnum):
     LOCAL = "local"
     S3 = "s3"
+    ICEBERG = "iceberg"
 
 
 if __name__ == "__main__":
@@ -43,7 +44,7 @@ if __name__ == "__main__":
     match data_source_type := args.data_source:
         case DataSourceType.LOCAL:
             data_source = LocalFileDataSource(
-                path=Path(os.environ["CONSUMER_LOCAL_FILE_SOURCE_PATH"])
+                path=Path(os.environ["CONSUMER_LOCAL_SOURCE_PATH"])
             )
         case DataSourceType.S3:
             data_source = S3DataSource(
@@ -56,35 +57,29 @@ if __name__ == "__main__":
 
     match data_sink_type := args.data_sink:
         case DataSinkType.LOCAL:
-            data_sink = LocalFileDataSink(
-                path=Path(os.environ["CONSUMER_LOCAL_FILE_SINK_PATH"])
+            data_sink = LocalDataSink(path=Path(os.environ["CONSUMER_LOCAL_SINK_PATH"]))
+            dead_letters_sink = LocalDataSink(
+                path=Path(os.environ["CONSUMER_LOCAL_DEAD_LETTERS_SINK_PATH"])
             )
         case DataSinkType.S3:
             data_sink = S3DataSink(
                 path=S3Path.from_uri(os.environ["CONSUMER_S3_SINK_PATH"])
             )
-        case _:
-            raise NotImplementedError(f"Unsupported data sink type: {data_sink_type}")
-
-    match dead_letters_sink_type := data_sink_type:
-        case DataSinkType.LOCAL:
-            dead_letters_sink = LocalFileDataSink(
-                path=Path(os.environ["CONSUMER_LOCAL_FILE_DEAD_LETTERS_SINK_PATH"])
+            dead_letters_sink = S3DataSink(
+                path=S3Path.from_uri(os.environ["CONSUMER_S3_DEAD_LETTERS_SINK_PATH"])
             )
-        case DataSinkType.S3:
+        case DataSinkType.ICEBERG:
+            data_sink = IcebergDataSink(
+                table_name=os.environ["CONSUMER_ICEBERG_TABLE_NAME"]
+            )
             dead_letters_sink = S3DataSink(
                 path=S3Path.from_uri(os.environ["CONSUMER_S3_DEAD_LETTERS_SINK_PATH"])
             )
         case _:
-            raise NotImplementedError(
-                f"Unsupported dead letters sink type: {dead_letters_sink_type}"
-            )
-
-    print(data_source, data_sink, dead_letters_sink)
-    print(data_source._path, data_sink._path, dead_letters_sink._path)
+            raise NotImplementedError(f"Unsupported data sink type: {data_sink_type}")
 
     checkpoint_location = (
-        Path(os.environ["CONSUMER_LOCAL_FILE_CHECKPOINTS_PATH"])
+        Path(os.environ["CONSUMER_LOCAL_CHECKPOINTS_PATH"])
         if args.data_sink == DataSinkType.LOCAL
         else S3Path.from_uri(os.environ["CONSUMER_S3_CHECKPOINTS_PATH"])
     )
@@ -95,7 +90,7 @@ if __name__ == "__main__":
     )
     if (
         isinstance(data_source, S3DataSource)
-        or isinstance(data_sink, S3DataSink)
+        or isinstance(data_sink, (S3DataSink, IcebergDataSink))
         or isinstance(dead_letters_sink, S3DataSink)
         or isinstance(checkpoint_location, S3Path)
     ):
@@ -104,6 +99,13 @@ if __name__ == "__main__":
             aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
             aws_endpoint_url=os.environ["AWS_ENDPOINT_URL"],
             aws_region=os.environ["AWS_REGION"],
+        )
+    if isinstance(data_sink, IcebergDataSink):
+        session_builder.with_iceberg(
+            catalog_name=os.environ.get("CONSUMER_ICEBERG_CATALOG_NAME", "iceberg"),
+            warehouse_path=S3Path.from_uri(
+                os.environ["CONSUMER_ICEBERG_WAREHOUSE_PATH"]
+            ),
         )
 
     stream_processor = StreamProcessor(

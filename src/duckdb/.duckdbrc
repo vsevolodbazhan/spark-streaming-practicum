@@ -1,6 +1,8 @@
--- Install and load httpfs extension for S3 access.
 INSTALL httpfs;
 LOAD httpfs;
+
+INSTALL iceberg;
+LOAD iceberg;
 
 -- Configure S3 connection to MinIO.
 -- Uses path-style URLs (endpoint/bucket) instead of virtual-hosted (bucket.endpoint).
@@ -15,7 +17,10 @@ SET s3_use_ssl=false;
 
 -- Create views for convenient data access.
 create schema bronze;
-create view bronze.events as select * from read_parquet(getenv('CONSUMER_S3_SINK_PATH') || '/*.parquet');
+create view bronze.events
+as select * from iceberg_scan(
+    getenv('CONSUMER_ICEBERG_WAREHOUSE_PATH') || getenv('CONSUMER_ICEBERG_TABLE_PATH')
+);
 
 create schema dead_letters;
 create view dead_letters.events as select * from read_parquet(getenv('CONSUMER_S3_DEAD_LETTERS_SINK_PATH') || '/*.parquet');

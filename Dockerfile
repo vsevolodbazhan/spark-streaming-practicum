@@ -31,16 +31,16 @@ ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 
 RUN uv sync --only-group consumer
 
-# Download Hadoop AWS JARs for S3 support. These must match Hadoop version
-# bundled with PySpark (3.4.x for PySpark 4.x). Installing at build time avoids
+# Download JARs for S3 and Iceberg support. These must match Hadoop version
+# bundled with PySpark (3.3.x for PySpark 3.5.x). Installing at build time avoids
 # download overhead at startup.
 # - hadoop-aws: S3A filesystem implementation
-# - aws-java-sdk-bundle: AWS SDK v1 (legacy, still required by hadoop-aws)
-# - bundle (awssdk): AWS SDK v2 (required by Hadoop 3.4+)
+# - aws-java-sdk-bundle: AWS SDK (required by hadoop-aws)
+# - iceberg-spark-runtime: Apache Iceberg runtime for Spark 3.5
 RUN SPARK_JARS=$(uv run python -c "import pyspark; print(pyspark.__path__[0])")/jars && \
-    curl -o $SPARK_JARS/hadoop-aws-3.4.1.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar && \
-    curl -o $SPARK_JARS/aws-java-sdk-bundle-1.12.367.jar https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.367/aws-java-sdk-bundle-1.12.367.jar && \
-    curl -o $SPARK_JARS/bundle-2.29.51.jar https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.29.51/bundle-2.29.51.jar
+    curl -o $SPARK_JARS/hadoop-aws-3.3.4.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && \
+    curl -o $SPARK_JARS/aws-java-sdk-bundle-1.12.262.jar https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar && \
+    curl -o $SPARK_JARS/iceberg-spark-runtime-3.5_2.12-1.7.1.jar https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.7.1/iceberg-spark-runtime-3.5_2.12-1.7.1.jar
 
 COPY ./src/consumer ./src/consumer
 
