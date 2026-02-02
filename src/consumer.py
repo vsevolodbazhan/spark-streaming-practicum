@@ -27,9 +27,19 @@ SPARK_APP_NAME = "consumer"
 load_dotenv()
 
 
-class DataSourceSinkType(StrEnum):
+class DataSourceType(StrEnum):
     LOCAL_FILE = "local_file"
     S3 = "s3"
+
+
+class DataSinkType(StrEnum):
+    LOCAL_FILE = "local_file"
+    S3 = "s3"
+
+
+class DataSinkFormat(StrEnum):
+    PARQUET = "parquet"
+    ICEBERG = "iceberg"
 
 
 @dataclass
@@ -139,6 +149,14 @@ class JsonArrayStreamProcessor:
                     ),
                 ).alias(self.RAW_RECORD_COL_NAME),
             )
+            # Parse raw records against the schema.
+            .withColumn(
+                self.PARSED_RECORD_COL_NAME,
+                from_json(
+                    col(self.RAW_RECORD_COL_NAME),
+                    self._schema,
+                ),
+            )
             # Mark batches where JSON parsing failed
             # (exploded array of raw records in empty).
             .withColumn(
@@ -154,14 +172,6 @@ class JsonArrayStreamProcessor:
                 ),
             )
             .drop(self.RAW_BATCH_COL_NAME)
-            # Parse raw records against the schema.
-            .withColumn(
-                self.PARSED_RECORD_COL_NAME,
-                from_json(
-                    col(self.RAW_RECORD_COL_NAME),
-                    self._schema,
-                ),
-            )
             # Add metadata and flatten parsed records.
             .selectExpr(
                 "_metadata.file_path as _source",
@@ -244,10 +254,16 @@ class JsonArrayStreamProcessor:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--data-source-sink",
-        choices=list(DataSourceSinkType),
-        default=DataSourceSinkType.LOCAL_FILE,
-        help="Data source and sink type.",
+        "--data-source",
+        choices=list(DataSourceType),
+        default=DataSourceType.LOCAL_FILE,
+        help="Data source type.",
+    )
+    parser.add_argument(
+        "--data-sink",
+        choices=list(DataSinkType),
+        default=DataSinkType.LOCAL_FILE,
+        help="Data sink type.",
     )
     parser.add_argument(
         "--source-path",
@@ -275,8 +291,14 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    match data_source_sink := args.data_source_sink:
-        case DataSourceSinkType.LOCAL_FILE:
+    if args.data_source != args.data_sink:
+        raise NotImplementedError(
+            f"Mismatched data source ({args.data_source}) and sink ({args.data_sink}) "
+            "types are not supported"
+        )
+
+    match data_source_type := args.data_source:
+        case DataSourceType.LOCAL_FILE:
             environment = create_local_file_environment(
                 source_path=Path(
                     args.source_path or os.environ["CONSUMER_LOCAL_FILE_SOURCE_PATH"]
@@ -293,7 +315,8 @@ if __name__ == "__main__":
                     or os.environ["CONSUMER_LOCAL_FILE_DEAD_LETTERS_SINK_PATH"]
                 ),
             )
-        case DataSourceSinkType.S3:
+
+        case DataSourceType.S3:
             environment = create_s3_environment(
                 aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
                 aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
@@ -313,9 +336,10 @@ if __name__ == "__main__":
                     or os.environ["CONSUMER_S3_DEAD_LETTERS_SINK_PATH"]
                 ),
             )
+
         case _:
             raise NotImplementedError(
-                f"Unsupported data source/sink type: {data_source_sink}"
+                f"Unsupported data source/sink type: {data_source_type}"
             )
 
     processor = JsonArrayStreamProcessor(
