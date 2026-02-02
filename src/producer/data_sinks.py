@@ -50,7 +50,7 @@ class DataSink:
                 raise NotImplementedError("Unsupported data format.")
 
         logger.info(
-            "Serialized batch",
+            "serialized_batch",
             batch_size=sys.getsizeof(serialized_batch),
             units="bytes",
         )
@@ -118,7 +118,7 @@ class LocalFileDataSink(_FileDataSink):
     def _write(self, serialized_batch: bytes) -> Any:
         file = self._output / self._generate_file_name()
         file.write_bytes(serialized_batch)
-        logger.info("Written batch to file", file=file)
+        logger.info("written_batch_to_file", file=file)
 
 
 class S3DataSink(_FileDataSink):
@@ -151,7 +151,7 @@ class S3DataSink(_FileDataSink):
             aws_secret_access_key=secret_key,
         )
         logger.info(
-            "Set up sink",
+            "set_up_sink",
             endpoint_url=endpoint_url,
             region=region,
             bucket=self._bucket,
@@ -164,4 +164,4 @@ class S3DataSink(_FileDataSink):
             Bucket=self._bucket,
             Key=key,
         )
-        logger.info("Uploaded batch", bucket=self._bucket, key=key)
+        logger.info("uploaded_batch", bucket=self._bucket, key=key)

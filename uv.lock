@@ -288,6 +288,7 @@ consumer = [
     { name = "pyspark" },
     { name = "python-dotenv" },
     { name = "s3path" },
+    { name = "structlog" },
 ]
 dev = [
     { name = "boto3-stubs", extra = ["essential"] },
@@ -308,6 +309,7 @@ consumer = [
     { name = "pyspark", specifier = ">=3.5.0,<3.6.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "s3path", specifier = ">=0.6.5" },
+    { name = "structlog", specifier = ">=25.5.0" },
 ]
 dev = [{ name = "boto3-stubs", extras = ["essential"], specifier = ">=1.42.39" }]
 producer = [

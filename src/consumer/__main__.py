@@ -17,6 +17,8 @@ from s3path import S3Path
 from .batch_parsers import JsonArrayBatchParser
 from .data_sinks import IcebergDataSink, LocalDataSink, S3DataSink
 from .data_sources import LocalFileDataSource, S3DataSource
+
+# from .logging import configure_logging
 from .session_builder import SessionBuilder
 from .stream_processor import StreamProcessor
 
@@ -34,6 +36,7 @@ class DataSinkType(StrEnum):
 
 if __name__ == "__main__":
     load_dotenv()
+    # configure_logging()
 
     parser = argparse.ArgumentParser("consumer")
     parser.add_argument("--data-source", choices=list(DataSourceType))

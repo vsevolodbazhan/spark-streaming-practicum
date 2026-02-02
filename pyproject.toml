@@ -11,6 +11,7 @@ consumer = [
     "pyspark>=3.5.0,<3.6.0",
     "python-dotenv>=1.2.1",
     "s3path>=0.6.5",
+    "structlog>=25.5.0",
 ]
 dev = [
     "boto3-stubs[essential]>=1.42.39",

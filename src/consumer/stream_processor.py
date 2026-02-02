@@ -1,5 +1,7 @@
+import structlog
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, lit, when
+from pyspark.sql.streaming.query import StreamingQuery
 
 from .batch_parsers import BatchParser
 from .data_sinks import DataSink
@@ -38,6 +40,8 @@ class StreamProcessor:
     """
 
     DEAD_LETTER_REASON_COLUMN_NAME = "_dead_letter_reason"
+
+    _logger = structlog.get_logger(__name__)
 
     def __init__(
         self,
@@ -111,6 +115,12 @@ class StreamProcessor:
             ],
         )
 
+        self._logger.info(
+            "batch_routing",
+            num_valid_records=valid_batch.count(),
+            num_dead_lettered_records=invalid_batch.count(),
+        )
+
         # Write to sinks.
         for batch, sink in [
             (valid_batch, self._sink),
@@ -118,8 +128,24 @@ class StreamProcessor:
         ]:
             sink.write(batch)
 
+    def _log_progress(self, query: StreamingQuery) -> None:
+        """Log the last progress of a streaming query."""
+        progress = query.lastProgress
+        if progress is None:
+            return
+
+        self._logger.info(
+            "stream_progress",
+            batch_id=progress.get("batchId"),
+            num_input_rows=progress.get("numInputRows"),
+            input_rows_per_second=progress.get("inputRowsPerSecond"),
+            processed_rows_per_second=progress.get("processedRowsPerSecond"),
+            batch_duration_ms=progress.get("durationMs", {}).get("triggerExecution"),
+        )
+
     def start(self) -> None:
-        (
+        self._logger.info("stream_starting")
+        query = (
             self._parser.parse(self._source.load(self._session))
             .writeStream.option(
                 "checkpointLocation",
@@ -128,5 +154,14 @@ class StreamProcessor:
             .trigger(processingTime=self._trigger_interval)
             .foreachBatch(self._route_to_sinks)
             .start()
-            .awaitTermination()
         )
+
+        try:
+            while query.isActive:
+                query.awaitTermination(timeout=10)
+                self._log_progress(query)
+        except KeyboardInterrupt:
+            self._logger.info("stream_stopping", reason="keyboard_interrupt")
+            query.stop()
+        finally:
+            self._logger.info("stream_stopped")

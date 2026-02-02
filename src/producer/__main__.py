@@ -97,5 +97,5 @@ if __name__ == "__main__":
         events = event_factory.create_random_events(n=args.batch_size)
         data_sink.sink(events)
         sleep_duration = args.sleep_between_batches_seconds
-        logger.info("Sleeping", duration=sleep_duration, units="seconds")
+        logger.info("sleeping", duration=sleep_duration, units="seconds")
         sleep(sleep_duration)
