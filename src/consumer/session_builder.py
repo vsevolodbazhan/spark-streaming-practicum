@@ -32,7 +32,7 @@ class SessionBuilder:
     SRARK_APP_NAME = "consumer"
 
     def __init__(self) -> None:
-        self._builder = SparkSession.builder.appName(self.SRARK_APP_NAME)
+        self._builder = SparkSession.builder.appName(self.SRARK_APP_NAME)  # type: ignore
 
     def with_spark_ui(self, port: int) -> Self:
         """
