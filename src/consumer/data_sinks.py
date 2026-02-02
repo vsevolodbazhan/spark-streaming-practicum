@@ -10,7 +10,7 @@ from .utilities import convert_path_to_string
 class DataSinkMode(StrEnum):
     """Write mode for data sinks."""
 
-    DATA_SINK_MODE = "append"
+    APPEND = "append"
 
 
 class DataSinkFormat(StrEnum):
@@ -49,8 +49,8 @@ class LocalFileDataSink(DataSink):
         self,
         path: Path,
         *,
-        format: DataSinkFormat,
-        mode: DataSinkMode,
+        format: DataSinkFormat = DataSinkFormat.PARQUET,
+        mode: DataSinkMode = DataSinkMode.APPEND,
     ) -> None:
         self._path = path
         self._format = format

@@ -77,19 +77,17 @@ services:
       AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
       CONSUMER_SPARK_UI_PORT: $CONSUMER_SPARK_UI_PORT
+      CONSUMER_S3_SOURCE_PATH: $CONSUMER_S3_SOURCE_PATH
+      CONSUMER_S3_SINK_PATH: $CONSUMER_S3_SINK_PATH
+      CONSUMER_S3_DEAD_LETTERS_SINK_PATH: $CONSUMER_S3_DEAD_LETTERS_SINK_PATH
+      CONSUMER_S3_CHECKPOINTS_PATH: $CONSUMER_S3_CHECKPOINTS_PATH
     ports:
       - $CONSUMER_SPARK_UI_PORT:$CONSUMER_SPARK_UI_PORT
     command:
-      - --data-source-sink
+      - --data-source
       - s3
-      - --source-path
-      - "$CONSUMER_S3_SOURCE_PATH"
-      - --checkpoints-path
-      - "$CONSUMER_S3_CHECKPOINTS_PATH"
-      - --sink-path
-      - "$CONSUMER_S3_SINK_PATH"
-      - --dead-letters-sink-path
-      - "$CONSUMER_S3_DEAD_LETTERS_SINK_PATH"
+      - --data-sink
+      - s3
     restart: on-failure
     depends_on:
       minio-create-buckets:

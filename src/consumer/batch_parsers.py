@@ -1,6 +1,10 @@
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import col, explode_outer, from_json
-from pyspark.sql.types import ArrayType, StringType, StructField, StructType
+from pyspark.sql.functions import coalesce, col, explode_outer, from_json
+from pyspark.sql.types import (
+    ArrayType,
+    StringType,
+    StructType,
+)
 
 
 class BatchParser:
@@ -28,33 +32,45 @@ class BatchParser:
 
     RAW_BATCH_COLUMN_NAME = "_raw_batch"
     RAW_RECORD_COLUMN_NAME = "_raw_record"
+    IS_CORRUPTED_BATCH_COLUMN_NAME = "_is_currupted_batch"
     PARSED_RECORD_COLUMN_NAME = "_parsed_record"
 
     def __init__(self, parsed_record_schema: StructType) -> None:
-        self._parsed_record_schema = parsed_record_schema
-
-    @property
-    def _parsed_dataframe_schema(self) -> StructType:
-        """Return the full schema of the parsed dataframe including metadata columns."""
-        return StructType(
-            [
-                StructField(self.RAW_BATCH_COLUMN_NAME, StringType(), nullable=True),
-                StructField(self.RAW_RECORD_COLUMN_NAME, StringType(), nullable=True),
-                StructField(
-                    self.PARSED_RECORD_COLUMN_NAME,
-                    self._parsed_record_schema,
-                    nullable=True,
-                ),
-            ]
-        )
+        self.parsed_record_schema = parsed_record_schema
 
     def parse(self, batch: DataFrame) -> DataFrame:
-        return self._parse(batch).select(
-            # Enforce output schema.
-            [
-                col(field.name).cast(field.dataType)
-                for field in self._parsed_dataframe_schema.fields
-            ]
+        return (
+            self._parse(batch)
+            # Mark batches where JSON parsing failed
+            # (exploded array of raw records in empty).
+            .withColumn(
+                self.IS_CORRUPTED_BATCH_COLUMN_NAME,
+                col(self.RAW_RECORD_COLUMN_NAME).isNull(),
+            )
+            # For corrupted batches, use the original batch as the raw record.
+            .withColumn(
+                self.RAW_RECORD_COLUMN_NAME,
+                coalesce(
+                    col(self.RAW_RECORD_COLUMN_NAME),
+                    col(self.RAW_BATCH_COLUMN_NAME),
+                ),
+            )
+            .drop(self.RAW_BATCH_COLUMN_NAME)
+            .select(
+                [
+                    col(column_name)
+                    # Select parsing metadata columns.
+                    for column_name in [
+                        self.RAW_RECORD_COLUMN_NAME,
+                        self.IS_CORRUPTED_BATCH_COLUMN_NAME,
+                    ]
+                    # Select parsed columns specified in the schema.
+                    + [
+                        f"{self.PARSED_RECORD_COLUMN_NAME}.{field.name}"
+                        for field in self.parsed_record_schema
+                    ]
+                ]
+            )
         )
 
     def _parse(self, batch: DataFrame) -> DataFrame:
@@ -92,7 +108,7 @@ class JsonArrayBatchParser(BatchParser):
                 self.PARSED_RECORD_COLUMN_NAME,
                 from_json(
                     col(self.RAW_RECORD_COLUMN_NAME),
-                    self._parsed_record_schema,
+                    self.parsed_record_schema,
                 ),
             )
         )
