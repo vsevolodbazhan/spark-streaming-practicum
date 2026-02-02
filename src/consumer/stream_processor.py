@@ -80,8 +80,15 @@ class StreamProcessor:
                 ~has_all_required,
                 lit("invalid_schema"),
             )
+            .when(
+                col(self._parser.HAS_EXTRA_FIELDS_COLUMN_NAME),
+                lit("extra_fields"),
+            )
             .otherwise(lit(None)),
-        ).drop(self._parser.IS_CORRUPTED_BATCH_COLUMN_NAME)
+        ).drop(
+            self._parser.IS_CORRUPTED_BATCH_COLUMN_NAME,
+            self._parser.HAS_EXTRA_FIELDS_COLUMN_NAME,
+        )
 
         # If there is no reason to dead letter, drop service columns
         # and route to valid records.
