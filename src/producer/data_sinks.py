@@ -17,7 +17,7 @@ logger = structlog.getLogger()
 
 class DataSinkType(StrEnum):
     STDOUT = "stdout"
-    LOCAL_FILE = "local_file"
+    LOCAL = "local"
     S3 = "s3"
 
 

@@ -125,6 +125,7 @@ if __name__ == "__main__":
                     StructField("event_id", StringType(), nullable=False),
                     StructField("event_timestamp", TimestampType(), nullable=False),
                     StructField("event_type", StringType(), nullable=False),
+                    StructField("product_id", StringType(), nullable=True),
                     StructField(
                         "properties", MapType(StringType(), StringType()), nullable=True
                     ),

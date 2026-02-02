@@ -15,6 +15,7 @@ logger = structlog.getLogger()
 
 class EventType(StrEnum):
     PAGE_VIEW = "page_view"
+    PURCHASE = "purchase"
 
 
 def _validate_chance_value(value: float) -> None:
@@ -46,7 +47,7 @@ class EventFactory:
 
     def create_random_events(self, n: int = 1) -> Iterator[dict]:
         """
-        Create a batch of random events.
+        Create a batch of events.
         """
         for _ in range(n):
             yield self.create_event(
@@ -76,6 +77,8 @@ class EventFactory:
         match event_type:
             case EventType.PAGE_VIEW:
                 event = self._create_page_view_event()
+            case EventType.PURCHASE:
+                event = self._create_purchase_event()
             case _:
                 raise NotImplementedError()
 
@@ -111,6 +114,20 @@ class EventFactory:
             "properties": {
                 "url": fake.url(),
                 "user_agent": fake.user_agent(),
+            },
+        }
+
+    def _create_purchase_event(self) -> dict:
+        """
+        Purchase event with new top-level field.
+        """
+        return self._create_event_scaffold() | {
+            "event_type": str(EventType.PURCHASE),
+            # New top-level field for schema evolution.
+            "product_id": fake.uuid4(),
+            "properties": {
+                "amount": round(random.uniform(1.0, 500.0), 2),
+                "currency": random.choice(["USD", "EUR", "GBP"]),
             },
         }
 

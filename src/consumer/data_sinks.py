@@ -100,6 +100,30 @@ class IcebergDataSink(DataSink):
         except AnalysisException:
             return False
 
+    def _evolve_schema_if_needed(self, batch: DataFrame) -> None:
+        """
+        Evolve Iceberg table schema to match the batch schema.
+
+        Handles addition of new columns and type widening.
+        """
+        session = batch.sparkSession
+        existing_columns = {
+            field.name: field for field in session.table(self._table_name).schema.fields
+        }
+        for column in batch.schema.fields:
+            if column.name not in existing_columns:
+                # Add new column.
+                session.sql(
+                    f"ALTER TABLE {self._table_name} ADD COLUMN "
+                    f"`{column.name}` {column.dataType.simpleString()}"
+                )
+            elif column.dataType != existing_columns[column.name].dataType:
+                # Change type.
+                session.sql(
+                    f"ALTER TABLE {self._table_name} ALTER COLUMN "
+                    f"`{column.name}` TYPE {column.dataType.simpleString()}"
+                )
+
     def with_partitioned_by(self, _partitioned_by: Column | None) -> Self:
         """
         Set partioning predicate.
@@ -119,5 +143,5 @@ class IcebergDataSink(DataSink):
             writer.create()
             self._table_exists = True
         else:
-            # mergeSchema option enables schema evolution.
-            batch.writeTo(self._table_name).option("mergeSchema", "true").append()
+            self._evolve_schema_if_needed(batch)
+            batch.writeTo(self._table_name).append()

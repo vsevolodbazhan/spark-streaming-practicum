@@ -71,8 +71,8 @@ if __name__ == "__main__":
     match data_sink_type := args.data_sink:
         case DataSinkType.STDOUT:
             data_sink = StdoutDataSink(**common_data_sinks_arguments)
-        case DataSinkType.LOCAL_FILE:
-            target = args.target or os.environ["PRODUCER_LOCAL_FILE_TARGET"]
+        case DataSinkType.LOCAL:
+            target = args.target or os.environ["PRODUCER_LOCAL_TARGET"]
             data_sink = LocalFileDataSink(
                 output=Path(target),
                 **common_data_sinks_arguments,

@@ -1,5 +1,10 @@
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import coalesce, col, explode_outer, from_json
+from pyspark.sql.functions import (
+    coalesce,
+    col,
+    explode_outer,
+    from_json,
+)
 from pyspark.sql.types import (
     ArrayType,
     StringType,
