@@ -56,8 +56,7 @@ class BatchParser:
         expected_field_count = len(self.parsed_record_schema.fields)
         return (
             self._parse(batch)
-            # Mark batches where JSON parsing failed
-            # (exploded array of raw records in empty).
+            # Mark batches where parsing failed.
             .withColumn(
                 self.IS_CORRUPTED_BATCH_COLUMN_NAME,
                 col(self.RAW_RECORD_COLUMN_NAME).isNull(),
