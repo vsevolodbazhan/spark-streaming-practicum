@@ -20,7 +20,7 @@ Python script that generates events attributed to users.
 
 - Events are being streamed to S3 in JSON format.
 - User IDs are picked from a pre-generated list to simulate events from the same user.
-- Events are of a single type with a static schema.
+- Events are of of multiple types with different schemas.
 - Events are never late.
 - **Events may have invalid schema.**
 - **Events may be duplicated.**
