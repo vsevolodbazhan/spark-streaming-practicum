@@ -85,9 +85,9 @@ Both operations should be run periodically. While Iceberg supports running these
 
 This project has evolved in three stages that build on each other:
 
-1. [Always-valid messages at the source; raw Parquet files](https://github.com/vsevolodbazhan/spark-streaming-practicum/tree/stage-1).
-2. [Handling invalid schemas and corrupted batches using a dead-letter sink](https://github.com/vsevolodbazhan/spark-streaming-practicum/tree/stage-2).
-3. [Sink to Iceberg; partitioning, schema evolution, handling events with extra fields, logging](https://github.com/vsevolodbazhan/spark-streaming-practicum/tree/stage-3) (current).
+1. [Always-valid messages at the source; raw Parquet files](https://github.com/vsevolodbazhan/streaming-ingestion-pipeline/tree/stage-1).
+2. [Handling invalid schemas and corrupted batches using a dead-letter sink](https://github.com/vsevolodbazhan/streaming-ingestion-pipeline/tree/stage-2).
+3. [Sink to Iceberg; partitioning, schema evolution, handling events with extra fields, logging](https://github.com/vsevolodbazhan/streaming-ingestion-pipeline/tree/stage-3) (current).
 
 ## Usage
 
