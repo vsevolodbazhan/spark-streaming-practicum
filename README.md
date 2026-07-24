@@ -1,4 +1,4 @@
-# Streaming Ingestion Pipeline: Spark → Iceberg
+# Streaming Ingestion Pipeline
 
 A streaming ingestion pipeline built with Apache Spark Structured Streaming, handling the failure modes that show up in real event pipelines: invalid schemas, corrupted batches, duplicates, and schema evolution.
 
