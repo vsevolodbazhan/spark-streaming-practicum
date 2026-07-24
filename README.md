@@ -1,6 +1,8 @@
-# Spark Streaming Practicum
+# Streaming Ingestion Pipeline: Spark → Iceberg
 
-Practice project to explore and implement streaming data ingestion patterns using Apache Spark Structured Streaming. The project is structured into three components: **producer** is a generator of artificial data implemented in Python, **consumer** is a Spark Streaming–based data ingestion pipeline, **duckdb** is a DuckDB-powered reader of ingested data. Storage is handled by S3-like MinIO.
+A streaming ingestion pipeline built with Apache Spark Structured Streaming, handling the failure modes that show up in real event pipelines: invalid schemas, corrupted batches, duplicates, and schema evolution.
+
+**Producer** generates synthetic user events with realistic failure modes injected (invalid schemas, duplicates, corrupted batches, evolving schemas). **Consumer** is the Spark Structured Streaming job that validates, enriches, and writes the data. **DuckDB** provides ad-hoc querying over the output. Storage is S3-compatible (MinIO).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="diagrams/architecture-dark.png">
